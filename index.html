@@ -15,7 +15,52 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
         @supports (padding: max(0px)) { body { padding-bottom: env(safe-area-inset-bottom); } }
-        @media (max-width: 767px) { body { height:auto; min-height:100dvh; overflow:visible; } main { overflow:visible !important; } header .container { padding-left:.85rem; padding-right:.85rem; } .mobile-tab-nav { scrollbar-width:none; } .mobile-tab-nav::-webkit-scrollbar { display:none; } input,select,textarea,button { touch-action:manipulation; } }
+        * { box-sizing:border-box; }
+        html,body { max-width:100%; overflow-x:hidden; }
+        img,canvas,svg { max-width:100%; }
+        @media(max-width:767px) {
+          body { min-height:100dvh; height:auto; overflow-x:hidden; overflow-y:auto; background:#f3f6f8; padding-bottom:calc(78px + env(safe-area-inset-bottom)); }
+          main { width:100%; max-width:100%; padding:12px 12px 24px !important; overflow:visible !important; }
+          header .container { padding:12px 12px 0; gap:10px; }
+          header .container>div:first-child { min-width:0; max-width:100%; }
+          header .container>div:first-child h1 { white-space:normal; font-size:14px; letter-spacing:.01em; }
+          .mobile-tab-nav { position:fixed; left:0; right:0; bottom:0; z-index:40; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:2px; width:100%; margin:0; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid #e2e8f0; background:rgba(255,255,255,.97); backdrop-filter:blur(16px); box-shadow:0 -5px 20px rgba(15,23,42,.08); }
+          .mobile-tab-nav .tab-btn { min-width:0; padding:9px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; border-radius:12px; color:#64748b; font-size:10px; line-height:1.1; white-space:normal; }
+          .mobile-tab-nav .tab-btn i { margin:0; font-size:16px; }
+          .mobile-tab-nav .tab-btn.bg-emerald-700,.mobile-tab-nav .tab-btn.active-tab { background:#ecfdf5; color:#047857; }
+          .tab-content { width:100%; min-width:0; }
+          .tab-content>div,.tab-content section { min-width:0; max-width:100%; }
+          .rounded-2xl { border-radius:16px; }
+          .tab-content .p-6 { padding:16px; } .tab-content .p-5 { padding:14px; }
+          h2 { overflow-wrap:anywhere; }
+          input,select,textarea,button { touch-action:manipulation; max-width:100%; }
+          input,select,textarea { min-width:0; font-size:16px !important; }
+          #dashboard .grid { grid-template-columns:minmax(0,1fr) !important; }
+          #dashboard canvas { max-height:260px; }
+          #expenses .grid { min-width:0; }
+          #expenses .overflow-x-auto { overflow:visible !important; }
+          #expenses table { width:100%; min-width:0 !important; table-layout:fixed; }
+          #expenses table thead { display:none; }
+          #expenses #receipt-items-body { display:block; width:100%; }
+          #expenses #receipt-items-body tr { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; width:100%; margin:0 0 12px; padding:12px; border:1px solid #e2e8f0; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(15,23,42,.04); }
+          #expenses #receipt-items-body td { display:grid; grid-template-columns:100px minmax(0,1fr); align-items:center; gap:8px; padding:0 !important; border:0; min-width:0; text-align:left; }
+          #expenses #receipt-items-body td::before { content:attr(data-label); color:#64748b; font-size:11px; font-weight:700; line-height:1.25; }
+          #expenses #receipt-items-body td:last-child { grid-template-columns:1fr auto; justify-items:end; }
+          #expenses #receipt-items-body td:last-child::before { content:"Aksi"; justify-self:start; }
+          #expenses #receipt-items-body input { width:100%; min-width:0 !important; padding:10px 8px; border-radius:9px; }
+          #expenses #receipt-items-body td[colspan] { display:block; text-align:center; padding:16px !important; }
+          #expenses #receipt-items-body td[colspan]::before { content:none; }
+          #history .history-desktop-table { display:none; }
+          #history-mobile-list { display:grid; gap:10px; }
+          #history-mobile-list .history-mobile-card { min-width:0; padding:14px; border:1px solid #e2e8f0; border-radius:16px; background:#fff; box-shadow:0 1px 3px rgba(15,23,42,.04); }
+          #history-mobile-list .history-mobile-card * { overflow-wrap:anywhere; }
+          #history>.bg-white:first-child { align-items:flex-start; gap:10px; padding:14px; }
+          #history>.bg-white:first-child h2 { font-size:16px; line-height:1.3; }
+          #history>.bg-white:first-child button { flex-shrink:0; padding:10px; }
+          #receipt-history { padding:14px; } #receipt-history-list>div { min-width:0; }
+          #receipt-preview { max-width:100%; height:auto; }
+        }
+        @media(min-width:768px) { #history-mobile-list { display:none; } }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -323,7 +368,7 @@
             </div>
 
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div class="overflow-x-auto">
+                <div class="history-desktop-table overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider font-bold">
@@ -340,6 +385,7 @@
                         </tbody>
                     </table>
                 </div>
+                <div id="history-mobile-list" class="hidden md:hidden p-3 space-y-3"></div>
             </div>
         </div>
     </main>
