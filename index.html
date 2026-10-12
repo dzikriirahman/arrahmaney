@@ -507,13 +507,14 @@
         };
         function renderReceiptItems() {
             const body = document.getElementById('receipt-items-body');
+            if (!body) return;
             if (!receiptItems.length) { body.innerHTML = '<tr><td colspan="5" class="p-5 text-center text-slate-400">Belum ada item. Jalankan deteksi struk atau tambah item.</td></tr>'; return; }
-            body.innerHTML = receiptItems.map((item,i) => `<tr class="border-b border-slate-100">
-                <td class="p-2"><input aria-label="Nama barang ${i+1}" value="${receiptEsc(item.name)}" onchange="updateReceiptItem(${i},'name',this.value)" class="w-full min-w-44 rounded-lg border border-slate-200 px-2 py-2" placeholder="Nama barang"></td>
-                <td class="p-2"><input aria-label="Jumlah ${i+1}" type="number" min="0" step="any" value="${receiptEsc(item.qty)}" onchange="updateReceiptItem(${i},'qty',this.value)" class="w-full rounded-lg border border-slate-200 px-2 py-2"></td>
-                <td class="p-2"><input aria-label="Satuan ${i+1}" value="${receiptEsc(item.unit)}" onchange="updateReceiptItem(${i},'unit',this.value)" class="w-full rounded-lg border border-slate-200 px-2 py-2" placeholder="pcs/dus/kg"></td>
-                <td class="p-2"><input aria-label="Total item rupiah ${i+1}" type="number" min="0" value="${receiptEsc(item.amount)}" onchange="updateReceiptItem(${i},'amount',this.value)" class="w-full rounded-lg border border-slate-200 px-2 py-2 text-right"></td>
-                <td class="p-2 text-center"><button type="button" onclick="removeReceiptItem(${i})" class="text-rose-500 hover:text-rose-700" aria-label="Hapus item"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+            body.innerHTML = receiptItems.map((item,i) => \`<tr class="border-b border-slate-100">
+                <td data-label="Nama barang" class="p-2"><input aria-label="Nama barang \${i+1}" value="\${receiptEsc(item.name)}" onchange="updateReceiptItem(\${i},'name',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2" placeholder="Nama barang"></td>
+                <td data-label="Jumlah" class="p-2"><input aria-label="Jumlah \${i+1}" type="number" min="0" step="any" value="\${receiptEsc(item.qty)}" onchange="updateReceiptItem(\${i},'qty',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2"></td>
+                <td data-label="Satuan" class="p-2"><input aria-label="Satuan \${i+1}" value="\${receiptEsc(item.unit)}" onchange="updateReceiptItem(\${i},'unit',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2" placeholder="pcs/dus/kg"></td>
+                <td data-label="Total item (Rp)" class="p-2"><input aria-label="Total item rupiah \${i+1}" type="number" min="0" value="\${receiptEsc(item.amount)}" onchange="updateReceiptItem(\${i},'amount',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2 text-right"></td>
+                <td data-label="Aksi" class="p-2 text-center"><button type="button" onclick="removeReceiptItem(\${i})" class="text-rose-500 hover:text-rose-700" aria-label="Hapus item"><i class="fas fa-trash"></i></button></td></tr>\`).join('');
         }
         window.updateReceiptItem = (i,key,value) => { if (!receiptItems[i]) return; receiptItems[i][key] = key === 'qty' || key === 'amount' ? (Number(value) || 0) : value; };
         window.removeReceiptItem = i => { receiptItems.splice(i,1); renderReceiptItems(); };
@@ -968,36 +969,41 @@
 
         function renderHistoryTable() {
             const tbody = document.getElementById('history-table-body');
+            const mobileList = document.getElementById('history-mobile-list');
             if (!tbody) return;
             tbody.innerHTML = '';
-
+            if (mobileList) mobileList.innerHTML = '';
             if (transactions.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">Belum ada data transaksi di database cloud.</td></tr>`;
+                tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Belum ada data transaksi di database cloud.</td></tr>';
+                if (mobileList) mobileList.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">Belum ada transaksi.</div>';
                 return;
             }
-
             transactions.forEach(trx => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-slate-50 transition-colors';
                 const isPemasukan = trx.jenis === 'pemasukan';
                 const badgeColor = isPemasukan ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700';
                 const nominalColor = isPemasukan ? 'text-emerald-600' : 'text-rose-600';
                 const sign = isPemasukan ? '+' : '-';
-                const dateStr = new Date(trx.tanggal).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year:'numeric'});
-
-                tr.innerHTML = `
-                    <td class="p-4 text-slate-600 whitespace-nowrap text-xs font-medium">${dateStr}</td>
-                    <td class="p-4"><span class="px-2.5 py-1 text-xs rounded-full ${badgeColor} capitalize font-semibold">${trx.jenis}</span></td>
-                    <td class="p-4 text-slate-800 font-semibold text-sm">${trx.kategori}</td>
-                    <td class="p-4 text-slate-600 text-xs">${historyDescription(trx)}</td>
-                    <td class="p-4 text-right font-extrabold ${nominalColor} whitespace-nowrap text-sm">${sign} ${formatRupiah(trx.nominal)}</td>
-                    <td class="p-4 text-center">
-                        <button onclick="deleteTransaction('${trx.id}')" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg transition-colors" title="Hapus">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                `;
+                const dateStr = new Date(trx.tanggal).toLocaleDateString('id-ID', {day:'numeric',month:'short',year:'numeric'});
+                const detailReceipt = String(trx.keterangan || '').startsWith('[DETAIL_STRUK]');
+                const actionHtml = (detailReceipt ? '<button onclick="editReceiptExpense(\''+receiptEsc(trx.id)+'\')" class="text-emerald-600 hover:text-emerald-800 p-2 rounded-lg" title="Lihat/edit detail struk"><i class="fas fa-eye"></i></button>' : '') +
+                    '<button onclick="deleteTransaction(\''+receiptEsc(trx.id)+'\')" class="text-slate-400 hover:text-rose-600 p-2 rounded-lg" title="Hapus"><i class="fas fa-trash"></i></button>';
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition-colors';
+                tr.innerHTML = '<td class="p-4 text-slate-600 whitespace-nowrap text-xs font-medium">'+dateStr+'</td>' +
+                    '<td class="p-4"><span class="px-2.5 py-1 text-xs rounded-full '+badgeColor+' capitalize font-semibold">'+receiptEsc(trx.jenis)+'</span></td>' +
+                    '<td class="p-4 text-slate-800 font-semibold text-sm">'+receiptEsc(trx.kategori)+'</td>' +
+                    '<td class="p-4 text-slate-600 text-xs">'+historyDescription(trx)+'</td>' +
+                    '<td class="p-4 text-right font-extrabold '+nominalColor+' whitespace-nowrap text-sm">'+sign+' '+formatRupiah(trx.nominal)+'</td>' +
+                    '<td class="p-4 text-center whitespace-nowrap">'+actionHtml+'</td>';
                 tbody.appendChild(tr);
+                if (mobileList) {
+                    const card = document.createElement('article');
+                    card.className = 'history-mobile-card';
+                    card.innerHTML = '<div class="flex items-start justify-between gap-3 mb-3"><div class="min-w-0"><p class="text-xs font-medium text-slate-500">'+dateStr+'</p><p class="mt-1 text-sm font-bold text-slate-800">'+receiptEsc(trx.kategori || 'Transaksi')+'</p></div><span class="shrink-0 px-2.5 py-1 text-[10px] rounded-full '+badgeColor+' capitalize font-bold">'+receiptEsc(trx.jenis)+'</span></div>' +
+                        '<p class="text-xs text-slate-500 leading-relaxed">'+historyDescription(trx)+'</p>' +
+                        '<div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2"><p class="text-base font-extrabold '+nominalColor+'">'+sign+' '+formatRupiah(trx.nominal)+'</p><div class="flex items-center gap-1">'+actionHtml+'</div></div>';
+                    mobileList.appendChild(card);
+                }
             });
         }
     </script>
