@@ -673,9 +673,19 @@
                     else { needsReview=true; flags.push('jumlah/harga satuan tidak jelas'); }
                 } else if (suffix.length === 2) {
                     const first = Number(String(suffix[0].token).replace(',','.'));
+                    const second = suffix[1].value;
                     const hasX = /\b\d+(?:[.,]\d+)?\s*[x×]\s*\d/i.test(line);
-                    if (hasX && first > 0 && first <= 100000) qty=first;
-                    else { qty=first > 0 && first <= 100000 ? first : 1; needsReview=true; flags.push('jumlah atau harga satuan ambigu'); }
+                    if (hasX && first > 0 && first <= 100000) {
+                        qty=first;
+                        unitPrice=second;
+                        amount=Math.round(qty*unitPrice);
+                        needsReview=true;
+                        flags.push('total baris tidak terbaca; total dihitung dari jumlah × harga satuan');
+                    } else {
+                        qty=first > 0 && first <= 100000 ? first : 1;
+                        needsReview=true;
+                        flags.push('jumlah atau harga satuan ambigu');
+                    }
                 } else {
                     needsReview=true;
                     flags.push('jumlah tidak tercetak atau tidak terbaca');
