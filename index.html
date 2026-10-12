@@ -893,60 +893,81 @@
             const reviewPenalty = items.filter(item=>item.needsReview).length;
             return average + Math.min(items.length,12)*1.8 - reviewPenalty*0.8;
         }
-        async function prepareGeminiReceiptImage(file) {
+        async function prepareGeminiReceiptImage(file, status) {
+            if (status) status.textContent = 'Menyiapkan foto struk…';
             const bitmap = await createImageBitmap(file);
             try {
-                const maxSide = 2200;
+                const maxSide = 1800;
                 const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
                 const canvas = document.createElement('canvas');
                 canvas.width = Math.max(1, Math.round(bitmap.width * scale));
                 canvas.height = Math.max(1, Math.round(bitmap.height * scale));
                 const ctx = canvas.getContext('2d', { alpha:false });
+                if (!ctx) throw new Error('Browser tidak dapat menyiapkan gambar. Coba browser terbaru atau foto lain.');
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-                let quality = 0.82;
+                if (status) status.textContent = 'Mengompres foto agar pengiriman tidak macet…';
+                let quality = 0.78;
                 let blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
-                while (blob && blob.size > 3.7 * 1024 * 1024 && quality > 0.48) {
-                    quality -= 0.1;
+                while (blob && blob.size > 2.7 * 1024 * 1024 && quality > 0.42) {
+                    quality = Math.max(0.42, quality - 0.12);
                     blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
                 }
-                if (!blob || blob.size > 3.9 * 1024 * 1024) throw new Error('Foto masih terlalu besar setelah dikompres. Crop bagian struk yang diperlukan lalu coba lagi.');
+                if (!blob || blob.size > 2.9 * 1024 * 1024) throw new Error('Foto masih terlalu besar setelah dikompres. Crop bagian struk lalu coba lagi.');
                 return blob;
             } finally {
                 bitmap.close();
             }
         }
+        function geminiBlobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const result = String(reader.result || '');
+                    const comma = result.indexOf(',');
+                    if (comma < 0) return reject(new Error('Gagal membaca hasil kompresi foto.'));
+                    resolve(result.slice(comma + 1));
+                };
+                reader.onerror = () => reject(new Error('Browser gagal membaca foto yang sudah dikompres.'));
+                reader.readAsDataURL(blob);
+            });
+        }
         window.scanReceipt = async function() {
             const file = window.selectedReceiptFile || document.getElementById('receipt-camera-file').files?.[0] || document.getElementById('receipt-gallery-file').files?.[0];
-            if (!file) { showToast('Pilih atau foto struk terlebih dahulu.','error'); return; }
-            if (!/^image\\//i.test(file.type || '')) { showToast('File bukan gambar yang didukung. Pilih foto struk.','error'); return; }
-            if (file.size > 15*1024*1024) { showToast('Ukuran foto lebih dari 15 MB. Pilih foto yang lebih kecil.','error'); return; }
             const button = document.getElementById('receipt-scan-btn'), status = document.getElementById('receipt-ocr-status');
             const rawText = document.getElementById('receipt-raw-text');
+            if (!file) { if(status) status.textContent = 'Pilih atau foto struk terlebih dahulu.'; showToast('Pilih atau foto struk terlebih dahulu.','error'); return; }
+            if (!/^image\\//i.test(file.type || '')) { if(status) status.textContent = 'File bukan gambar yang didukung. Pilih foto JPG, PNG, atau WebP.'; showToast('File bukan gambar yang didukung. Pilih foto struk.','error'); return; }
+            if (file.size > 15*1024*1024) { if(status) status.textContent = 'Ukuran foto lebih dari 15 MB. Crop foto atau pilih gambar yang lebih kecil.'; showToast('Ukuran foto lebih dari 15 MB. Pilih foto yang lebih kecil.','error'); return; }
+            if (button && button.disabled) return;
             const stage = receiptOcrStages[receiptOcrStage];
-            button.disabled = true; button.classList.add('opacity-60');
+            if (button) { button.disabled = true; button.classList.add('opacity-60'); }
+            let controller;
+            let timeoutId;
             try {
-                status.textContent = 'Menyiapkan foto dan mengompres gambar untuk Gemini AI…';
-                const blob = await prepareGeminiReceiptImage(file);
-                const bytes = new Uint8Array(await blob.arrayBuffer());
-                let binary = '';
-                const chunkSize = 0x8000;
-                for (let i=0;i<bytes.length;i+=chunkSize) binary += String.fromCharCode(...bytes.subarray(i, i+chunkSize));
-                const imageBase64 = btoa(binary);
-                status.textContent = 'Gemini AI sedang membaca tahap ' + stage.label.toLowerCase() + '…';
+                if (status) status.textContent = 'Mulai membaca foto…';
+                // Allow the browser to paint the status before image processing begins.
+                await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 30)));
+                const blob = await prepareGeminiReceiptImage(file, status);
+                if (status) status.textContent = 'Foto siap. Menyiapkan data untuk Gemini AI…';
+                const imageBase64 = await geminiBlobToBase64(blob);
+                if (status) status.textContent = 'Mengirim foto ke Gemini AI. Mohon tunggu…';
+                controller = new AbortController();
+                timeoutId = setTimeout(() => controller.abort(), 60000);
                 const response = await fetch('/.netlify/functions/gemini-receipt-ocr', {
                     method:'POST',
                     headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({ imageBase64:imageBase64, mimeType:'image/jpeg', stage:receiptOcrStage })
+                    body:JSON.stringify({ imageBase64:imageBase64, mimeType:'image/jpeg', stage:receiptOcrStage }),
+                    signal:controller.signal
                 });
                 let payload = {};
                 try { payload = await response.json(); } catch (_) {}
                 if (!response.ok) throw new Error(payload.error || 'Layanan Gemini gagal (' + response.status + ').');
                 const text = String(payload.text || '').trim();
-                if (!text) throw new Error('Gemini tidak menemukan teks yang terbaca. Coba crop lebih dekat atau gunakan foto yang lebih jelas.');
+                if (!text) throw new Error('Gemini tidak menghasilkan teks. Coba crop lebih dekat atau gunakan foto lebih jelas.');
                 if (rawText) rawText.value = text;
-                status.textContent = 'Teks mentah tahap ' + stage.label.toLowerCase() + ' siap diedit. Periksa hasilnya, lalu tekan “Terapkan Hasil Tahap Ini”.';
+                if (status) status.textContent = 'Teks mentah tahap ' + stage.label.toLowerCase() + ' siap diedit. Periksa hasilnya, lalu tekan “Terapkan Hasil Tahap Ini”.';
                 showToast('Gemini selesai membaca ' + stage.label.toLowerCase() + '. Periksa teks mentah sebelum menerapkan.','success');
                 if (receiptOcrStage === 'name' && !document.getElementById('receipt-supplier').value) {
                     const first = text.split(/\\n+/).map(x=>x.trim()).find(x=>x.length>2 && x.length<55 && /[a-zA-Z]/.test(x) && !/invoice|faktur|nota|tanggal|telp|total/i.test(x));
@@ -954,11 +975,14 @@
                 }
             } catch (err) {
                 console.error('Gemini receipt OCR error:',err);
-                const message = err && err.message ? err.message : 'kesalahan tidak diketahui';
-                status.textContent = 'OCR Gemini gagal: ' + message;
+                const message = err && err.name === 'AbortError'
+                    ? 'Permintaan Gemini melewati batas 60 detik. Coba foto yang sudah di-crop; jika berulang, periksa log Netlify Function.'
+                    : (err && err.message ? err.message : 'kesalahan tidak diketahui');
+                if (status) status.textContent = 'OCR Gemini gagal: ' + message;
                 showToast(message,'error');
             } finally {
-                button.disabled = false; button.classList.remove('opacity-60');
+                if (timeoutId) clearTimeout(timeoutId);
+                if (button) { button.disabled = false; button.classList.remove('opacity-60'); }
             }
         };
         window.saveReceiptExpense = async function() {
