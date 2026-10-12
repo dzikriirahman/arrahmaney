@@ -532,8 +532,8 @@
             body.innerHTML = receiptItems.map((item,i) => {
                 const flags = Array.isArray(item.reviewFlags) ? item.reviewFlags : [];
                 const note = item.needsReview
-                    ? '<p class="mt-1 text-[11px] font-semibold text-amber-700">Perlu diperiksa' + (flags.length ? ': ' + receiptEsc(flags.join(', ')) : '') + '</p>'
-                    : '<p class="mt-1 text-[11px] text-emerald-700">Struktur baris terbaca</p>';
+                    ? '<p class="mt-1 text-[11px] font-semibold text-amber-700">Perlu diperiksa' + (flags.length ? ': ' + receiptEsc(flags.join(', ')) : '') + '</p><button type="button" onclick="confirmReceiptItem(' + i + ')" class="mt-1 text-[11px] font-semibold text-emerald-700 underline">Saya sudah memeriksa baris ini</button>'
+                    : (item.confidence != null ? '<p class="mt-1 text-[11px] text-emerald-700">Baris sudah diperiksa</p>' : '');
                 return '<tr class="border-b border-slate-100">' +
                     '<td data-label="Nama barang" class="p-2"><input aria-label="Nama barang ' + (i+1) + '" value="' + receiptEsc(item.name) + '" onchange="updateReceiptItem(' + i + ',\'name\',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2" placeholder="Nama barang">' + note + (item.rawLine ? '<details class="mt-1"><summary class="cursor-pointer text-[10px] text-slate-400">Baris OCR asli</summary><p class="mt-1 break-words text-[10px] text-slate-500">' + receiptEsc(item.rawLine) + '</p></details>' : '') + '</td>' +
                     '<td data-label="Jumlah" class="p-2"><input aria-label="Jumlah ' + (i+1) + '" type="number" min="0" step="any" value="' + receiptEsc(item.qty) + '" onchange="updateReceiptItem(' + i + ',\'qty\',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2"></td>' +
@@ -554,8 +554,18 @@
             } else {
                 item[key] = value;
             }
-            item.needsReview = false;
-            item.reviewFlags = [];
+            const flags = Array.isArray(item.reviewFlags) ? item.reviewFlags : [];
+            if (key === 'name') item.reviewFlags = flags.filter(flag => flag !== 'nama barang tidak jelas');
+            if (key === 'qty') item.reviewFlags = flags.filter(flag => !/jumlah/i.test(flag));
+            if (key === 'unitPrice' || key === 'amount') item.reviewFlags = flags.filter(flag => !/harga|total baris/i.test(flag));
+            item.needsReview = item.reviewFlags.length > 0 || (item.confidence != null && Number(item.confidence) < 65);
+            renderReceiptItems();
+            updateReceiptTotalHint();
+        };
+        window.confirmReceiptItem = i => {
+            if (!receiptItems[i]) return;
+            receiptItems[i].needsReview = false;
+            receiptItems[i].reviewFlags = [];
             renderReceiptItems();
             updateReceiptTotalHint();
         };
@@ -801,17 +811,46 @@
                         else if (m.status === 'loading language traineddata') status.textContent = 'Menyiapkan bahasa OCR…';
                     }
                 });
+                const metaElements = {
+                    date:document.getElementById('receipt-date'),
+                    invoice:document.getElementById('receipt-invoice'),
+                    total:document.getElementById('receipt-total')
+                };
+                const originalMeta = {
+                    date:metaElements.date ? metaElements.date.value : '',
+                    invoice:metaElements.invoice ? metaElements.invoice.value : '',
+                    total:metaElements.total ? metaElements.total.value : ''
+                };
+                const restoreMeta = () => {
+                    if (metaElements.date) metaElements.date.value = originalMeta.date;
+                    if (metaElements.invoice) metaElements.invoice.value = originalMeta.invoice;
+                    if (metaElements.total) metaElements.total.value = originalMeta.total;
+                };
                 let best = null;
                 for (let i=0;i<candidates.length;i++) {
+                    restoreMeta();
                     status.textContent = 'Menguji pemrosesan foto ' + (i+1) + ' dari ' + candidates.length + ': ' + candidates[i].label + '…';
                     const result = await worker.recognize(candidates[i].canvas);
                     const data = result.data || {};
                     const text = String(data.text || '');
                     const items = parseReceiptText(text, data);
+                    const inferredMeta = {
+                        date:metaElements.date ? metaElements.date.value : '',
+                        invoice:metaElements.invoice ? metaElements.invoice.value : '',
+                        total:metaElements.total ? metaElements.total.value : ''
+                    };
                     const score = scoreReceiptOcr(data,items);
-                    if (!best || score > best.score) best = {data:data,text:text,items:items,score:score,label:candidates[i].label};
+                    if (!best || score > best.score) best = {data:data,text:text,items:items,score:score,label:candidates[i].label,meta:inferredMeta};
                 }
                 if (!best) throw new Error('Tidak ada hasil OCR');
+                restoreMeta();
+                const finalItems = parseReceiptText(best.text,best.data);
+                if (best.meta) {
+                    if (metaElements.date && best.meta.date) metaElements.date.value = best.meta.date;
+                    if (metaElements.invoice && best.meta.invoice) metaElements.invoice.value = best.meta.invoice;
+                    if (metaElements.total && best.meta.total) metaElements.total.value = best.meta.total;
+                }
+                best.items = finalItems;
                 if (rawText) rawText.value = best.text;
                 if (best.items.length) {
                     receiptItems = best.items;
@@ -849,6 +888,12 @@
             const invoice = document.getElementById('receipt-invoice').value.trim();
             const supplier = document.getElementById('receipt-supplier').value.trim();
             const validItems = receiptItems.filter(i => String(i.name).trim());
+            const unresolved = validItems.filter(i => i.needsReview);
+            if (unresolved.length) {
+                const accepted = confirm('Masih ada ' + unresolved.length + ' baris OCR yang perlu diperiksa. Pastikan nama, jumlah, harga satuan, dan total sudah sesuai foto. Simpan hasil ini?');
+                if (!accepted) return;
+                unresolved.forEach(item => { item.needsReview=false; item.reviewFlags=[]; });
+            }
             if (!date) { showToast('Tanggal invoice wajib diisi.','error'); return; }
             if (!total || total <= 0) { showToast('Total belanja harus diisi dengan benar.','error'); return; }
             if (!supabaseClient) { showToast('Koneksi database tidak tersedia.','error'); return; }
@@ -896,7 +941,7 @@
             document.getElementById('receipt-invoice').value = detail.invoice || '';
             document.getElementById('receipt-supplier').value = detail.supplier || '';
             document.getElementById('receipt-total').value = Number(t.nominal) || 0;
-            receiptItems = Array.isArray(detail.items) ? detail.items.map(i => ({name:i.name || '',qty:i.qty == null ? 1 : i.qty,unit:i.unit || 'pcs',unitPrice:i.unitPrice == null ? '' : Number(i.unitPrice)||0,amount:Number(i.amount)||0,confidence:i.confidence ?? null,needsReview:!!i.needsReview,reviewFlags:Array.isArray(i.reviewFlags)?i.reviewFlags:[],rawLine:i.rawLine||''})) : [];
+            receiptItems = Array.isArray(detail.items) ? detail.items.map(i => ({name:i.name || '',qty:i.qty == null ? 1 : i.qty,unit:i.unit || 'pcs',unitPrice:i.unitPrice == null || i.unitPrice === '' ? '' : Number(i.unitPrice)||0,amount:Number(i.amount)||0,confidence:i.confidence ?? null,needsReview:!!i.needsReview,reviewFlags:Array.isArray(i.reviewFlags)?i.reviewFlags:[],rawLine:i.rawLine||''})) : [];
             renderReceiptItems(); updateReceiptTotalHint();
             document.getElementById('receipt-save-btn').innerHTML = '<i class="fas fa-save mr-2"></i>Simpan Perubahan';
             document.getElementById('receipt-cancel-edit').classList.remove('hidden');
