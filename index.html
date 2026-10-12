@@ -940,7 +940,7 @@
             const button = document.getElementById('receipt-scan-btn'), status = document.getElementById('receipt-ocr-status');
             const rawText = document.getElementById('receipt-raw-text');
             if (!file) { if(status) status.textContent = 'Pilih atau foto struk terlebih dahulu.'; showToast('Pilih atau foto struk terlebih dahulu.','error'); return; }
-            if (!/^image\\//i.test(file.type || '')) { if(status) status.textContent = 'File bukan gambar yang didukung. Pilih foto JPG, PNG, atau WebP.'; showToast('File bukan gambar yang didukung. Pilih foto struk.','error'); return; }
+            if (!/^image\//i.test(file.type || '')) { if(status) status.textContent = 'File bukan gambar yang didukung. Pilih foto JPG, PNG, atau WebP.'; showToast('File bukan gambar yang didukung. Pilih foto struk.','error'); return; }
             if (file.size > 15*1024*1024) { if(status) status.textContent = 'Ukuran foto lebih dari 15 MB. Crop foto atau pilih gambar yang lebih kecil.'; showToast('Ukuran foto lebih dari 15 MB. Pilih foto yang lebih kecil.','error'); return; }
             if (button && button.disabled) return;
             const stage = receiptOcrStages[receiptOcrStage];
