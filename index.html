@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- Supabase JS SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -43,6 +43,9 @@
                 </button>
                 <button onclick="switchTab('input')" class="tab-btn px-4 py-2 rounded-lg hover:bg-emerald-800/60 transition-all text-sm font-medium text-emerald-200 flex items-center gap-2" data-target="input">
                     <i class="fas fa-plus-circle"></i>Input Transaksi
+                </button>
+                <button onclick="switchTab('expenses')" class="tab-btn px-4 py-2 rounded-lg hover:bg-emerald-800/60 transition-all text-sm font-medium text-emerald-200 flex items-center gap-2" data-target="expenses">
+                    <i class="fas fa-receipt"></i>Detail Pengeluaran
                 </button>
                 <button onclick="switchTab('history')" class="tab-btn px-4 py-2 rounded-lg hover:bg-emerald-800/60 transition-all text-sm font-medium text-emerald-200 flex items-center gap-2" data-target="history">
                     <i class="fas fa-history"></i>Riwayat & Buku Besar
@@ -240,6 +243,53 @@
             </div>
         </div>
 
+        <!-- DETAIL PENGELUARAN / OCR STRUK -->
+        <div id="expenses" class="tab-content fade-in hidden max-w-5xl mx-auto">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-7 mb-5">
+                <div class="flex items-center gap-3 mb-5 pb-4 border-b border-slate-100">
+                    <div class="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center"><i class="fas fa-receipt text-xl"></i></div>
+                    <div><h2 class="text-xl font-bold text-slate-900">Detail Pengeluaran Kulakan</h2>
+                    <p class="text-sm text-slate-500">Foto struk akan dibaca otomatis. Periksa dan koreksi hasil deteksi sebelum disimpan.</p></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Foto struk / invoice</label>
+                        <input id="receipt-file" type="file" accept="image/*" capture="environment" class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-4 file:py-2.5 file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100">
+                        <p class="text-xs text-slate-400 mt-2">Di HP, tombol dapat membuka kamera. Di komputer, pilih foto dari folder.</p>
+                        <img id="receipt-preview" class="hidden mt-3 max-h-80 max-w-full rounded-xl border border-slate-200 object-contain" alt="Pratinjau foto struk">
+                        <button type="button" id="receipt-scan-btn" onclick="scanReceipt()" class="mt-4 w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 font-bold text-sm"><i class="fas fa-camera mr-2"></i>Deteksi Isi Struk</button>
+                        <p id="receipt-ocr-status" class="text-xs text-slate-500 mt-3" aria-live="polite">Pilih foto yang jelas dan tidak terpotong, lalu jalankan deteksi.</p>
+                    </div>
+                    <div class="space-y-4">
+                        <div><label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Tanggal invoice</label><input id="receipt-date" type="date" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm"></div>
+                        <div><label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">No. invoice / struk</label><input id="receipt-invoice" type="text" placeholder="Nomor invoice" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm"></div>
+                        <div><label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Nama toko / supplier (opsional)</label><input id="receipt-supplier" type="text" placeholder="Nama supplier" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm"></div>
+                        <div><label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Total belanja (Rp)</label><input id="receipt-total" type="number" min="0" placeholder="0" oninput="updateReceiptTotalHint()" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-right text-lg font-bold"></div>
+                        <p id="receipt-total-hint" class="text-xs text-slate-500">Total dapat dikoreksi sesuai angka pada struk.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-7">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div><h3 class="font-bold text-slate-900">Rincian barang yang dibeli</h3><p class="text-xs text-slate-500 mt-1">Nama, jumlah, satuan, dan harga/total item bisa diedit manual.</p></div>
+                    <button type="button" onclick="addReceiptItem()" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700"><i class="fas fa-plus mr-1"></i>Tambah item</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[650px] text-sm">
+                        <thead><tr class="bg-slate-50 text-left text-xs uppercase text-slate-500"><th class="p-2">Nama barang</th><th class="p-2 w-24">Jumlah</th><th class="p-2 w-28">Satuan</th><th class="p-2 w-36">Total item (Rp)</th><th class="p-2 w-12"></th></tr></thead>
+                        <tbody id="receipt-items-body"><tr><td colspan="5" class="p-5 text-center text-slate-400">Belum ada item. Jalankan deteksi struk atau tambah item.</td></tr></tbody>
+                    </table>
+                </div>
+                <div class="mt-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-t border-slate-100 pt-4">
+                    <p class="text-xs text-slate-500 max-w-xl">OCR bisa keliru membaca cetakan, angka, atau nama barang. Pastikan rincian dan total sama dengan struk asli.</p>
+                    <button type="button" onclick="saveReceiptExpense()" class="shrink-0 rounded-xl bg-rose-600 hover:bg-rose-700 px-5 py-3 text-sm font-bold text-white"><i class="fas fa-cloud-upload-alt mr-2"></i>Simpan Detail Pengeluaran</button>
+                </div>
+            </div>
+            <div id="receipt-history" class="mt-5 bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                <h3 class="font-bold text-slate-900 mb-3">Pengeluaran struk tersimpan</h3><div id="receipt-history-list" class="space-y-2 text-sm text-slate-500">Memuat data...</div>
+            </div>
+        </div>
+
         <!-- HISTORY TAB -->
         <div id="history" class="tab-content fade-in hidden">
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-4 flex justify-between items-center">
@@ -327,6 +377,7 @@
             });
 
             if(tabId === 'history') renderHistoryTable();
+            if(tabId === 'expenses') renderReceiptHistory();
             if(tabId === 'dashboard') {
                 setTimeout(() => { updateDashboard(); }, 100);
             }
@@ -362,6 +413,150 @@
             setTimeout(() => toast.remove(), 3000);
         }
 
+
+        // Modul detail pengeluaran: OCR berjalan di browser, data transaksi memakai tabel transactions yang sudah ada.
+        let receiptItems = [];
+        let receiptImageUrl = null;
+        const receiptMoney = n => new Intl.NumberFormat('id-ID').format(Math.max(0, Number(n) || 0));
+        const receiptEsc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+        document.addEventListener('DOMContentLoaded', () => {
+            const fileInput = document.getElementById('receipt-file');
+            if (fileInput) fileInput.addEventListener('change', () => {
+                const file = fileInput.files && fileInput.files[0];
+                const preview = document.getElementById('receipt-preview');
+                if (!file) return;
+                if (receiptImageUrl) URL.revokeObjectURL(receiptImageUrl);
+                receiptImageUrl = URL.createObjectURL(file);
+                preview.src = receiptImageUrl;
+                preview.classList.remove('hidden');
+                document.getElementById('receipt-ocr-status').textContent = 'Foto siap diproses. Tekan “Deteksi Isi Struk”.';
+            });
+            const date = document.getElementById('receipt-date');
+            if (date) date.valueAsDate = new Date();
+        });
+        window.addReceiptItem = function(item = {}) {
+            receiptItems.push({name:item.name || '', qty:item.qty ?? 1, unit:item.unit || 'pcs', amount:item.amount ?? 0});
+            renderReceiptItems();
+        };
+        function renderReceiptItems() {
+            const body = document.getElementById('receipt-items-body');
+            if (!receiptItems.length) { body.innerHTML = '<tr><td colspan="5" class="p-5 text-center text-slate-400">Belum ada item. Jalankan deteksi struk atau tambah item.</td></tr>'; return; }
+            body.innerHTML = receiptItems.map((item,i) => `<tr class="border-b border-slate-100">
+                <td class="p-2"><input aria-label="Nama barang ${i+1}" value="${receiptEsc(item.name)}" onchange="updateReceiptItem(${i},'name',this.value)" class="w-full min-w-44 rounded-lg border border-slate-200 px-2 py-2" placeholder="Nama barang"></td>
+                <td class="p-2"><input aria-label="Jumlah ${i+1}" type="number" min="0" step="any" value="${receiptEsc(item.qty)}" onchange="updateReceiptItem(${i},'qty',this.value)" class="w-full rounded-lg border border-slate-200 px-2 py-2"></td>
+                <td class="p-2"><input aria-label="Satuan ${i+1}" value="${receiptEsc(item.unit)}" onchange="updateReceiptItem(${i},'unit',this.value)" class="w-full rounded-lg border border-slate-200 px-2 py-2" placeholder="pcs/dus/kg"></td>
+                <td class="p-2"><input aria-label="Total item rupiah ${i+1}" type="number" min="0" value="${receiptEsc(item.amount)}" onchange="updateReceiptItem(${i},'amount',this.value)" class="w-full rounded-lg border border-slate-200 px-2 py-2 text-right"></td>
+                <td class="p-2 text-center"><button type="button" onclick="removeReceiptItem(${i})" class="text-rose-500 hover:text-rose-700" aria-label="Hapus item"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+        }
+        window.updateReceiptItem = (i,key,value) => { if (!receiptItems[i]) return; receiptItems[i][key] = key === 'qty' || key === 'amount' ? (Number(value) || 0) : value; };
+        window.removeReceiptItem = i => { receiptItems.splice(i,1); renderReceiptItems(); };
+        window.updateReceiptTotalHint = () => {
+            const total = Number(document.getElementById('receipt-total').value) || 0;
+            const sum = receiptItems.reduce((n,item) => n + (Number(item.amount)||0),0);
+            document.getElementById('receipt-total-hint').textContent = 'Jumlah total item: Rp ' + receiptMoney(sum) + ' • Total invoice: Rp ' + receiptMoney(total) + (sum && total && sum !== total ? ' • Periksa selisihnya.' : '');
+        };
+        function parseReceiptText(text) {
+            const lines = text.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+            const dateMatch = text.match(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})\b/);
+            if (dateMatch) {
+                let year = dateMatch[3]; if (year.length === 2) year = '20'+year;
+                const d = new Date(Number(year),Number(dateMatch[2])-1,Number(dateMatch[1]));
+                if (!isNaN(d.getTime())) document.getElementById('receipt-date').value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+            }
+            const invoiceLine = lines.find(line => /invoice|faktur|no\.?\s*(inv|invoice|faktur|nota)|struk|receipt/i.test(line));
+            if (invoiceLine) {
+                const m = invoiceLine.match(/(?:invoice|faktur|nota|struk|receipt)\s*(?:no\.?|#|:)?\s*([A-Z0-9\/-]{3,})/i);
+                if (m) document.getElementById('receipt-invoice').value = m[1];
+            }
+            const money = value => Number(String(value).replace(/[^\d]/g,'')) || 0;
+            const totalLines = lines.filter(line => /grand\s*total|total\s*belanja|total\s*bayar|jumlah\s*total|\btotal\b/i.test(line));
+            let total = 0;
+            for (const line of totalLines) { const matches = line.match(/(?:Rp\.?\s*)?[\d][\d.,]*/gi) || []; if (matches.length) { const candidate = money(matches[matches.length-1]); if (candidate > total) total = candidate; } }
+            if (total) document.getElementById('receipt-total').value = total;
+            const parsed = [];
+            for (const line of lines) {
+                if (/grand\s*total|total\s*belanja|total\s*bayar|jumlah\s*total|\btotal\b|subtotal|tunai|kembali|cash|invoice|faktur|tanggal|date|kasir|terima kasih|change/i.test(line)) continue;
+                const nums = [...line.matchAll(/\d+(?:[.,]\d+)?/g)];
+                if (!nums.length) continue;
+                const last = nums[nums.length-1], amount = money(last[0]);
+                let name = line.slice(0,last.index).replace(/[|*:=#-]+$/,'').trim();
+                if (!name || name.length < 2 || !/[a-zA-ZÀ-ÿ]/.test(name) || amount <= 0) continue;
+                const qtyMatch = name.match(/^(.*?)[\s*x×]+(\d+(?:[.,]\d+)?)\s*(pcs|pc|kg|gr|g|dus|karton|pack|pak|ikat|botol|renteng|lusin)?$/i);
+                let qty=1, unit='pcs';
+                if (qtyMatch) { name=qtyMatch[1].trim(); qty=Number(qtyMatch[2].replace(',','.'))||1; unit=qtyMatch[3]||'pcs'; }
+                parsed.push({name,qty,unit,amount});
+            }
+            return parsed;
+        }
+        window.scanReceipt = async function() {
+            const file = document.getElementById('receipt-file').files?.[0];
+            if (!file) { showToast('Pilih atau foto struk terlebih dahulu.','error'); return; }
+            if (!window.Tesseract) { showToast('Layanan OCR gagal dimuat. Periksa koneksi internet.','error'); return; }
+            const button = document.getElementById('receipt-scan-btn'), status = document.getElementById('receipt-ocr-status');
+            button.disabled = true; button.classList.add('opacity-60'); status.textContent = 'Membaca teks pada foto… proses dapat memerlukan waktu.';
+            try {
+                const result = await Tesseract.recognize(file, 'ind+eng', {logger: m => { if (m.status === 'recognizing text') status.textContent = 'Mendeteksi teks: ' + Math.round((m.progress || 0)*100) + '%'; }});
+                const text = result.data.text || '';
+                const items = parseReceiptText(text);
+                if (items.length) { receiptItems = items; renderReceiptItems(); }
+                else { receiptItems = []; renderReceiptItems(); }
+                updateReceiptTotalHint();
+                status.textContent = items.length ? `Selesai. ${items.length} kandidat item terdeteksi. Periksa hasilnya karena OCR bisa salah.` : 'Teks terbaca, tetapi item belum dapat dikenali otomatis. Tambahkan/koreksi item secara manual.';
+                if (!document.getElementById('receipt-invoice').value) {
+                    const code = text.match(/(?:INV|FAK|NOTA)[\s:#-]*[A-Z0-9/-]{3,}/i);
+                    if (code) document.getElementById('receipt-invoice').value = code[0];
+                }
+                if (!document.getElementById('receipt-supplier').value) {
+                    const first = text.split(/\n+/).map(x=>x.trim()).find(x=>x.length>2 && x.length<55 && /[a-zA-Z]/.test(x) && !/invoice|faktur|nota|tanggal|telp|total/i.test(x));
+                    if (first) document.getElementById('receipt-supplier').value = first;
+                }
+            } catch (err) {
+                console.error('OCR receipt error:',err);
+                status.textContent = 'Gagal membaca foto. Coba foto lebih terang, lurus, dan fokus.';
+                showToast('Deteksi struk gagal. Silakan coba foto lain.','error');
+            } finally { button.disabled = false; button.classList.remove('opacity-60'); }
+        };
+        window.saveReceiptExpense = async function() {
+            const date = document.getElementById('receipt-date').value;
+            const total = Number(document.getElementById('receipt-total').value) || 0;
+            const invoice = document.getElementById('receipt-invoice').value.trim();
+            const supplier = document.getElementById('receipt-supplier').value.trim();
+            const validItems = receiptItems.filter(i => String(i.name).trim());
+            if (!date) { showToast('Tanggal invoice wajib diisi.','error'); return; }
+            if (!total || total <= 0) { showToast('Total belanja harus diisi dengan benar.','error'); return; }
+            if (!supabaseClient) { showToast('Koneksi database tidak tersedia.','error'); return; }
+            const detail = {type:'receipt_expense_v1',invoice,supplier,items:validItems,source:'photo_ocr',savedAt:new Date().toISOString()};
+            const trx = {id:'TRX-'+Date.now(),jenis:'pengeluaran',tanggal:date,kategori:'Pembelian Barang (Kulakan Stok)',nominal:total,keterangan:'[DETAIL_STRUK] '+JSON.stringify(detail),timestamp:new Date().toISOString()};
+            const button = document.querySelector('#expenses button[onclick="saveReceiptExpense()"]');
+            if (button) { button.disabled=true; button.classList.add('opacity-60'); }
+            try {
+                const {error} = await supabaseClient.from('transactions').insert([trx]);
+                if (error) throw error;
+                transactions.unshift(trx); updateDashboard(); renderHistoryTable(); renderReceiptHistory();
+                showToast('Detail pengeluaran berhasil disimpan ke Cloud.');
+                receiptItems=[]; renderReceiptItems();
+                ['receipt-invoice','receipt-supplier','receipt-total'].forEach(id=>document.getElementById(id).value='');
+                document.getElementById('receipt-date').valueAsDate = new Date();
+                document.getElementById('receipt-file').value='';
+                document.getElementById('receipt-preview').classList.add('hidden');
+                document.getElementById('receipt-ocr-status').textContent='Data tersimpan. Siap memasukkan struk berikutnya.';
+            } catch (err) { console.error(err); showToast('Gagal menyimpan detail ke cloud: '+(err.message||'kesalahan database'),'error'); }
+            finally { if (button) { button.disabled=false; button.classList.remove('opacity-60'); } }
+        };
+        window.renderReceiptHistory = function() {
+            const list = document.getElementById('receipt-history-list'); if (!list) return;
+            const rows = transactions.filter(t => String(t.keterangan||'').startsWith('[DETAIL_STRUK]'));
+            if (!rows.length) { list.innerHTML='<p>Belum ada pengeluaran struk yang tersimpan.</p>'; return; }
+            list.innerHTML = rows.slice().sort((a,b)=>String(b.tanggal).localeCompare(String(a.tanggal))).map(t=>{
+                let detail={}; try { detail=JSON.parse(String(t.keterangan).replace(/^\[DETAIL_STRUK\]\s*/,'')); } catch(e) {}
+                const items = Array.isArray(detail.items) ? detail.items : [];
+                return `<div class="rounded-xl border border-slate-200 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div><p class="font-semibold text-slate-800">${receiptEsc(detail.supplier||'Kulakan')}${detail.invoice?' • Invoice '+receiptEsc(detail.invoice):''}</p>
+                    <p class="text-xs text-slate-500">${receiptEsc(t.tanggal)} • ${items.length} item: ${items.slice(0,3).map(i=>receiptEsc(i.name)).join(', ')}${items.length>3?'…':''}</p></div>
+                    <p class="font-bold text-rose-600">Rp ${receiptMoney(t.nominal)}</p></div>`;
+            }).join('');
+        };
+
         window.loadDataFromSupabase = async function() {
             if (!supabaseClient) return;
             try {
@@ -374,6 +569,7 @@
                 transactions = data || [];
                 updateDashboard();
                 renderHistoryTable();
+                renderReceiptHistory();
                 showToast("Data berhasil disinkronisasi dari Cloud!");
             } catch (err) {
                 console.error("Gagal memuat:", err.message);
