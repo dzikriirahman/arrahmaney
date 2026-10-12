@@ -921,45 +921,23 @@
                     const result = await worker.recognize(candidates[i].canvas);
                     const data = result.data || {};
                     const text = String(data.text || '');
-                    const items = parseReceiptText(text, data);
                     const inferredMeta = {
                         date:metaElements.date ? metaElements.date.value : '',
                         invoice:metaElements.invoice ? metaElements.invoice.value : '',
                         total:metaElements.total ? metaElements.total.value : ''
                     };
-                    const score = scoreReceiptOcr(data,items);
-                    if (!best || score > best.score) best = {data:data,text:text,items:items,score:score,label:candidates[i].label,meta:inferredMeta};
+                    const score = scoreReceiptOcr(data,[]);
+                    if (!best || score > best.score) best = {data:data,text:text,score:score,label:candidates[i].label,meta:inferredMeta};
                 }
                 if (!best) throw new Error('Tidak ada hasil OCR');
                 restoreMeta();
-                const finalItems = parseReceiptText(best.text,best.data);
-                if (best.meta) {
-                    if (metaElements.date && best.meta.date) metaElements.date.value = best.meta.date;
-                    if (metaElements.invoice && best.meta.invoice) metaElements.invoice.value = best.meta.invoice;
-                    if (metaElements.total && best.meta.total) metaElements.total.value = best.meta.total;
-                }
-                best.items = finalItems;
                 if (rawText) rawText.value = best.text;
-                if (best.items.length) {
-                    receiptItems = best.items;
-                    renderReceiptItems();
-                } else {
-                    receiptItems = [];
-                    renderReceiptItems();
-                }
-                updateReceiptTotalHint();
-                const lowConfidence = best.items.filter(item=>item.needsReview).length;
-                status.textContent = best.items.length
-                    ? 'Selesai menggunakan versi ' + best.label + '. Ditemukan ' + best.items.length + ' kandidat barang; ' + lowConfidence + ' baris perlu diperiksa. Cocokkan nama, jumlah, harga satuan, dan total dengan foto.'
-                    : 'Teks sudah dibaca, tetapi baris barang belum dikenali dengan yakin. Gunakan teks mentah sebagai bantuan lalu koreksi atau tambahkan barang secara manual.';
+                status.textContent = 'Teks mentah tahap ' + receiptOcrStages[receiptOcrStage].label.toLowerCase() + ' siap diedit. Perbaiki baris yang salah, lalu tekan “Terapkan Hasil Tahap Ini”.';
+                showToast('Deteksi ' + receiptOcrStages[receiptOcrStage].label.toLowerCase() + ' selesai. Periksa teks mentah, lalu terapkan.','success');
                 const text = best.text;
-                if (!document.getElementById('receipt-invoice').value) {
-                    const code = text.match(/(?:INV|FAK|NOTA)[\s:#-]*[A-Z0-9/-]{3,}/i);
-                    if (code) document.getElementById('receipt-invoice').value = code[0];
-                }
-                if (!document.getElementById('receipt-supplier').value) {
+                if (receiptOcrStage === 'name' && !document.getElementById('receipt-supplier').value) {
                     const first = text.split(/\n+/).map(x=>x.trim()).find(x=>x.length>2 && x.length<55 && /[a-zA-Z]/.test(x) && !/invoice|faktur|nota|tanggal|telp|total/i.test(x));
-                    if (first) document.getElementById('receipt-supplier').value = first;
+                    if (first && /supplier|toko|grosir/i.test(first)) document.getElementById('receipt-supplier').value = first;
                 }
             } catch (err) {
                 console.error('OCR receipt error:',err);
