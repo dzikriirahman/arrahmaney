@@ -432,19 +432,25 @@
         // Modul detail pengeluaran: OCR berjalan di browser, data transaksi memakai tabel transactions yang sudah ada.
         let receiptItems = [];
         let receiptImageUrl = null;
+        let editingReceiptId = null;
+        window.selectedReceiptFile = null;
         const receiptMoney = n => new Intl.NumberFormat('id-ID').format(Math.max(0, Number(n) || 0));
         const receiptEsc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
         document.addEventListener('DOMContentLoaded', () => {
-            const fileInput = document.getElementById('receipt-file');
-            if (fileInput) fileInput.addEventListener('change', () => {
-                const file = fileInput.files && fileInput.files[0];
-                const preview = document.getElementById('receipt-preview');
-                if (!file) return;
-                if (receiptImageUrl) URL.revokeObjectURL(receiptImageUrl);
-                receiptImageUrl = URL.createObjectURL(file);
-                preview.src = receiptImageUrl;
-                preview.classList.remove('hidden');
-                document.getElementById('receipt-ocr-status').textContent = 'Foto siap diproses. Tekan “Deteksi Isi Struk”.';
+            ['receipt-camera-file','receipt-gallery-file'].forEach(id => {
+                const fileInput = document.getElementById(id);
+                if (!fileInput) return;
+                fileInput.addEventListener('change', () => {
+                    const file = fileInput.files && fileInput.files[0];
+                    const preview = document.getElementById('receipt-preview');
+                    if (!file) return;
+                    if (receiptImageUrl) URL.revokeObjectURL(receiptImageUrl);
+                    receiptImageUrl = URL.createObjectURL(file);
+                    preview.src = receiptImageUrl;
+                    preview.classList.remove('hidden');
+                    document.getElementById('receipt-ocr-status').textContent = 'Foto siap diproses. Tekan “Deteksi Isi Struk”.';
+                    window.selectedReceiptFile = file;
+                });
             });
             const date = document.getElementById('receipt-date');
             if (date) date.valueAsDate = new Date();
@@ -471,40 +477,74 @@
             document.getElementById('receipt-total-hint').textContent = 'Jumlah total item: Rp ' + receiptMoney(sum) + ' • Total invoice: Rp ' + receiptMoney(total) + (sum && total && sum !== total ? ' • Periksa selisihnya.' : '');
         };
         function parseReceiptText(text) {
-            const lines = text.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+            // Parsing berurutan per baris: satu baris harus tampak seperti baris barang,
+            // bukan sekadar teks yang kebetulan memuat angka.
+            const lines = text.split(/\r?\n+/).map(x => x.replace(/[|]/g,' ').replace(/\s{2,}/g,' ').trim()).filter(Boolean);
+            const money = value => Number(String(value).replace(/[^\d]/g,'')) || 0;
             const dateMatch = text.match(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})\b/);
             if (dateMatch) {
-                let year = dateMatch[3]; if (year.length === 2) year = '20'+year;
-                const d = new Date(Number(year),Number(dateMatch[2])-1,Number(dateMatch[1]));
+                let year = dateMatch[3]; if (year.length === 2) year = '20' + year;
+                const d = new Date(Number(year), Number(dateMatch[2])-1, Number(dateMatch[1]));
                 if (!isNaN(d.getTime())) document.getElementById('receipt-date').value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
             }
-            const invoiceLine = lines.find(line => /invoice|faktur|no\.?\s*(inv|invoice|faktur|nota)|struk|receipt/i.test(line));
+            const invoiceLine = lines.find(line => /\b(?:inv(?:oice)?|faktur|no\.?\s*(?:inv|invoice|faktur|nota)|nota|order)\b/i.test(line));
             if (invoiceLine) {
-                const m = invoiceLine.match(/(?:invoice|faktur|nota|struk|receipt)\s*(?:no\.?|#|:)?\s*([A-Z0-9\/-]{3,})/i);
+                const m = invoiceLine.match(/(?:inv(?:oice)?|faktur|nota|order)\s*(?:no\.?|#|:|-)?\s*([A-Z0-9][A-Z0-9\/-]{2,})/i);
                 if (m) document.getElementById('receipt-invoice').value = m[1];
             }
-            const money = value => Number(String(value).replace(/[^\d]/g,'')) || 0;
-            const totalLines = lines.filter(line => /grand\s*total|total\s*belanja|total\s*bayar|jumlah\s*total|\btotal\b/i.test(line));
+            const totalRows = lines.filter(line => /grand\s*total|total\s*belanja|total\s*bayar|jumlah\s*total|net\s*total|\btotal\b/i.test(line));
             let total = 0;
-            for (const line of totalLines) { const matches = line.match(/(?:Rp\.?\s*)?[\d][\d.,]*/gi) || []; if (matches.length) { const candidate = money(matches[matches.length-1]); if (candidate > total) total = candidate; } }
+            totalRows.forEach(line => {
+                const vals = [...line.matchAll(/(?:rp\.?\s*)?\d[\d.,]*/gi)];
+                if (vals.length) total = Math.max(total, money(vals[vals.length-1][0]));
+            });
             if (total) document.getElementById('receipt-total').value = total;
+
+            const skip = /grand\s*total|total\s*belanja|total\s*bayar|jumlah\s*total|\btotal\b|subtotal|pajak|ppn|diskon|tunai|kembali|cash|invoice|faktur|\binv\b|\bnota\b|\border\b|tanggal|\bdate\b|kasir|terima kasih|change|saldo|debit|kredit|member|telp|telepon|alamat|nomor|no\.?\s*(?:inv|faktur|nota)/i;
+            const unitRe = /\b(kg|kgs|gram|gr|g|ons|liter|ltr|ml|pcs?|buah|box|dus|karton|bal|pack|pak|ikat|botol|renteng|lusin|roll|rim|sak|karung|cup|bungkus|bks|set|unit)\b/i;
             const parsed = [];
             for (const line of lines) {
-                if (/grand\s*total|total\s*belanja|total\s*bayar|jumlah\s*total|\btotal\b|subtotal|tunai|kembali|cash|invoice|faktur|tanggal|date|kasir|terima kasih|change/i.test(line)) continue;
+                if (skip.test(line) || !/[a-zA-ZÀ-ÿ]/.test(line)) continue;
                 const nums = [...line.matchAll(/\d+(?:[.,]\d+)?/g)];
                 if (!nums.length) continue;
-                const last = nums[nums.length-1], amount = money(last[0]);
-                let name = line.slice(0,last.index).replace(/[|*:=#-]+$/,'').trim();
-                if (!name || name.length < 2 || !/[a-zA-ZÀ-ÿ]/.test(name) || amount <= 0) continue;
-                const qtyMatch = name.match(/^(.*?)[\s*x×]+(\d+(?:[.,]\d+)?)\s*(pcs|pc|kg|gr|g|dus|karton|pack|pak|ikat|botol|renteng|lusin)?$/i);
-                let qty=1, unit='pcs';
-                if (qtyMatch) { name=qtyMatch[1].trim(); qty=Number(qtyMatch[2].replace(',','.'))||1; unit=qtyMatch[3]||'pcs'; }
-                parsed.push({name,qty,unit,amount});
+                const unitMatch = line.match(unitRe);
+                const hasCurrency = /\brp\.?\s*\d/i.test(line) || /\bidr\s*\d/i.test(line);
+                const hasQuantityPrice = nums.length >= 2;
+                const hasQtyX = /\b\d+(?:[.,]\d+)?\s*[x×]\s*\d/i.test(line);
+                // Jika baris tidak punya harga/satuan/kolom angka yang masuk akal, abaikan.
+                if (!unitMatch && !hasCurrency && !hasQuantityPrice && !hasQtyX) continue;
+                const priceToken = nums[nums.length - 1];
+                const amount = money(priceToken[0]);
+                if (amount < 1) continue;
+                let name = line.slice(0, priceToken.index).replace(/[|*:=#-]+$/,'').trim();
+                if (!name || name.length < 2 || !/[a-zA-ZÀ-ÿ]/.test(name)) continue;
+                let qty = 1, unit = unitMatch ? unitMatch[1].toLowerCase() : 'pcs';
+                const qtyUnit = name.match(/\b(\d+(?:[.,]\d+)?)\s*(kg|kgs|gram|gr|g|ons|liter|ltr|ml|pcs?|buah|box|dus|karton|bal|pack|pak|ikat|botol|renteng|lusin|roll|rim|sak|karung|cup|bungkus|bks|set|unit)\b/i);
+                const qtyX = name.match(/\b(\d+(?:[.,]\d+)?)\s*[x×]\s*/i);
+                if (qtyUnit) {
+                    qty = Number(qtyUnit[1].replace(',','.')) || 1;
+                    unit = qtyUnit[2].toLowerCase();
+                    name = name.replace(qtyUnit[0], ' ').replace(/\s+/g,' ').trim();
+                } else if (qtyX) {
+                    qty = Number(qtyX[1].replace(',','.')) || 1;
+                    name = name.replace(qtyX[0], '').trim();
+                } else if (nums.length >= 3) {
+                    // Pola lazim: nama | qty | harga satuan | jumlah; ambil qty di kolom kiri harga.
+                    const q = Number(nums[nums.length-3][0].replace(',','.'));
+                    if (q > 0 && q <= 10000) qty = q;
+                } else if (nums.length === 2) {
+                    const q = Number(nums[0][0].replace(',','.'));
+                    if (q > 0 && q <= 10000 && nums[0].index < priceToken.index) qty = q;
+                }
+                name = name.replace(/\b(?:rp\.?|idr)\b/ig,'').replace(/\s+/g,' ').trim();
+                if (name.length < 2 || skip.test(name)) continue;
+                parsed.push({name:name,qty:qty,unit:unit,amount:amount});
             }
             return parsed;
         }
+
         window.scanReceipt = async function() {
-            const file = document.getElementById('receipt-file').files?.[0];
+            const file = window.selectedReceiptFile || document.getElementById('receipt-camera-file').files?.[0] || document.getElementById('receipt-gallery-file').files?.[0];
             if (!file) { showToast('Pilih atau foto struk terlebih dahulu.','error'); return; }
             if (!window.Tesseract) { showToast('Layanan OCR gagal dimuat. Periksa koneksi internet.','error'); return; }
             const button = document.getElementById('receipt-scan-btn'), status = document.getElementById('receipt-ocr-status');
@@ -552,7 +592,7 @@
                 receiptItems=[]; renderReceiptItems();
                 ['receipt-invoice','receipt-supplier','receipt-total'].forEach(id=>document.getElementById(id).value='');
                 document.getElementById('receipt-date').valueAsDate = new Date();
-                document.getElementById('receipt-file').value='';
+                document.getElementById('receipt-camera-file').value=''; document.getElementById('receipt-gallery-file').value=''; window.selectedReceiptFile=null;
                 document.getElementById('receipt-preview').classList.add('hidden');
                 document.getElementById('receipt-ocr-status').textContent='Data tersimpan. Siap memasukkan struk berikutnya.';
             } catch (err) { console.error(err); showToast('Gagal menyimpan detail ke cloud: '+(err.message||'kesalahan database'),'error'); }
