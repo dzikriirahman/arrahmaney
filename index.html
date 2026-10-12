@@ -9,7 +9,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- Supabase JS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
@@ -894,71 +893,71 @@
             const reviewPenalty = items.filter(item=>item.needsReview).length;
             return average + Math.min(items.length,12)*1.8 - reviewPenalty*0.8;
         }
+        async function prepareGeminiReceiptImage(file) {
+            const bitmap = await createImageBitmap(file);
+            try {
+                const maxSide = 2200;
+                const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+                canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+                const ctx = canvas.getContext('2d', { alpha:false });
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                let quality = 0.82;
+                let blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+                while (blob && blob.size > 3.7 * 1024 * 1024 && quality > 0.48) {
+                    quality -= 0.1;
+                    blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+                }
+                if (!blob || blob.size > 3.9 * 1024 * 1024) throw new Error('Foto masih terlalu besar setelah dikompres. Crop bagian struk yang diperlukan lalu coba lagi.');
+                return blob;
+            } finally {
+                bitmap.close();
+            }
+        }
         window.scanReceipt = async function() {
             const file = window.selectedReceiptFile || document.getElementById('receipt-camera-file').files?.[0] || document.getElementById('receipt-gallery-file').files?.[0];
             if (!file) { showToast('Pilih atau foto struk terlebih dahulu.','error'); return; }
-            if (!/^image\//i.test(file.type || '')) { showToast('File bukan gambar yang didukung. Pilih foto struk.','error'); return; }
+            if (!/^image\\//i.test(file.type || '')) { showToast('File bukan gambar yang didukung. Pilih foto struk.','error'); return; }
             if (file.size > 15*1024*1024) { showToast('Ukuran foto lebih dari 15 MB. Pilih foto yang lebih kecil.','error'); return; }
-            if (!window.Tesseract) { showToast('Layanan OCR gagal dimuat. Periksa koneksi internet.','error'); return; }
             const button = document.getElementById('receipt-scan-btn'), status = document.getElementById('receipt-ocr-status');
             const rawText = document.getElementById('receipt-raw-text');
+            const stage = receiptOcrStages[receiptOcrStage];
             button.disabled = true; button.classList.add('opacity-60');
-            let worker = null;
             try {
-                status.textContent = 'Menyiapkan foto dan membuat beberapa versi untuk dibandingkan…';
-                const candidates = await makeReceiptImageCandidates(file);
-                worker = await Tesseract.createWorker('ind+eng', 1, {
-                    logger: m => {
-                        if (m.status === 'recognizing text') status.textContent = 'Membaca kandidat gambar: ' + Math.round((m.progress || 0)*100) + '%';
-                        else if (m.status === 'loading language traineddata') status.textContent = 'Menyiapkan bahasa OCR…';
-                    }
+                status.textContent = 'Menyiapkan foto dan mengompres gambar untuk Gemini AI…';
+                const blob = await prepareGeminiReceiptImage(file);
+                const bytes = new Uint8Array(await blob.arrayBuffer());
+                let binary = '';
+                const chunkSize = 0x8000;
+                for (let i=0;i<bytes.length;i+=chunkSize) binary += String.fromCharCode(...bytes.subarray(i, i+chunkSize));
+                const imageBase64 = btoa(binary);
+                status.textContent = 'Gemini AI sedang membaca tahap ' + stage.label.toLowerCase() + '…';
+                const response = await fetch('/.netlify/functions/gemini-receipt-ocr', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({ imageBase64:imageBase64, mimeType:'image/jpeg', stage:receiptOcrStage })
                 });
-                const metaElements = {
-                    date:document.getElementById('receipt-date'),
-                    invoice:document.getElementById('receipt-invoice'),
-                    total:document.getElementById('receipt-total')
-                };
-                const originalMeta = {
-                    date:metaElements.date ? metaElements.date.value : '',
-                    invoice:metaElements.invoice ? metaElements.invoice.value : '',
-                    total:metaElements.total ? metaElements.total.value : ''
-                };
-                const restoreMeta = () => {
-                    if (metaElements.date) metaElements.date.value = originalMeta.date;
-                    if (metaElements.invoice) metaElements.invoice.value = originalMeta.invoice;
-                    if (metaElements.total) metaElements.total.value = originalMeta.total;
-                };
-                let best = null;
-                for (let i=0;i<candidates.length;i++) {
-                    restoreMeta();
-                    status.textContent = 'Menguji pemrosesan foto ' + (i+1) + ' dari ' + candidates.length + ': ' + candidates[i].label + '…';
-                    const result = await worker.recognize(candidates[i].canvas);
-                    const data = result.data || {};
-                    const text = String(data.text || '');
-                    const inferredMeta = {
-                        date:metaElements.date ? metaElements.date.value : '',
-                        invoice:metaElements.invoice ? metaElements.invoice.value : '',
-                        total:metaElements.total ? metaElements.total.value : ''
-                    };
-                    const score = scoreReceiptOcr(data,[]);
-                    if (!best || score > best.score) best = {data:data,text:text,score:score,label:candidates[i].label,meta:inferredMeta};
-                }
-                if (!best) throw new Error('Tidak ada hasil OCR');
-                restoreMeta();
-                if (rawText) rawText.value = best.text;
-                status.textContent = 'Teks mentah tahap ' + receiptOcrStages[receiptOcrStage].label.toLowerCase() + ' siap diedit. Perbaiki baris yang salah, lalu tekan “Terapkan Hasil Tahap Ini”.';
-                showToast('Deteksi ' + receiptOcrStages[receiptOcrStage].label.toLowerCase() + ' selesai. Periksa teks mentah, lalu terapkan.','success');
-                const text = best.text;
+                let payload = {};
+                try { payload = await response.json(); } catch (_) {}
+                if (!response.ok) throw new Error(payload.error || 'Layanan Gemini gagal (' + response.status + ').');
+                const text = String(payload.text || '').trim();
+                if (!text) throw new Error('Gemini tidak menemukan teks yang terbaca. Coba crop lebih dekat atau gunakan foto yang lebih jelas.');
+                if (rawText) rawText.value = text;
+                status.textContent = 'Teks mentah tahap ' + stage.label.toLowerCase() + ' siap diedit. Periksa hasilnya, lalu tekan “Terapkan Hasil Tahap Ini”.';
+                showToast('Gemini selesai membaca ' + stage.label.toLowerCase() + '. Periksa teks mentah sebelum menerapkan.','success');
                 if (receiptOcrStage === 'name' && !document.getElementById('receipt-supplier').value) {
-                    const first = text.split(/\n+/).map(x=>x.trim()).find(x=>x.length>2 && x.length<55 && /[a-zA-Z]/.test(x) && !/invoice|faktur|nota|tanggal|telp|total/i.test(x));
+                    const first = text.split(/\\n+/).map(x=>x.trim()).find(x=>x.length>2 && x.length<55 && /[a-zA-Z]/.test(x) && !/invoice|faktur|nota|tanggal|telp|total/i.test(x));
                     if (first && /supplier|toko|grosir/i.test(first)) document.getElementById('receipt-supplier').value = first;
                 }
             } catch (err) {
-                console.error('OCR receipt error:',err);
-                status.textContent = 'Gagal memproses foto. Coba foto lebih terang, lurus, fokus, dan seluruh struk terlihat.';
-                showToast('Deteksi struk gagal. Silakan coba foto lain.','error');
+                console.error('Gemini receipt OCR error:',err);
+                const message = err && err.message ? err.message : 'kesalahan tidak diketahui';
+                status.textContent = 'OCR Gemini gagal: ' + message;
+                showToast(message,'error');
             } finally {
-                if (worker) { try { await worker.terminate(); } catch (_) {} }
                 button.disabled = false; button.classList.remove('opacity-60');
             }
         };
