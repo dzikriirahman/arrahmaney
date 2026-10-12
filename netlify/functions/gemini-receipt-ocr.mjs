@@ -38,18 +38,15 @@ export default async (request) => {
   }
 
   try {
-    const upstream = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+    const upstream = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
-        contents: [{
-          role: "user",
-          parts: [
-            { text: "Anda adalah pembaca OCR struk belanja yang teliti. Baca hanya informasi yang benar-benar tampak pada foto. " + STAGE_PROMPTS[stage] },
-            { inline_data: { mime_type: mimeType, data: imageBase64 } }
-          ]
-        }],
-        generationConfig: { temperature: 0, maxOutputTokens: 4096 }
+        model: "gemini-3.8-flash",
+        input: [
+          { type: "text", text: "Anda adalah pembaca OCR struk belanja yang teliti. Baca hanya informasi yang benar-benar tampak pada foto. " + STAGE_PROMPTS[stage] },
+          { type: "image", mime_type: mimeType, data: imageBase64 }
+        ]
       })
     });
     const data = await upstream.json().catch(() => ({}));
@@ -62,7 +59,15 @@ export default async (request) => {
       if (upstream.status === 429) return respond(429, { error: "Kuota atau batas permintaan Gemini tercapai. Tunggu sebentar lalu coba lagi." });
       return respond(502, { error: "Layanan Gemini sedang bermasalah. Coba lagi beberapa saat." });
     }
-    const text = (data?.candidates?.[0]?.content?.parts || []).map(part => part.text || "").join("").trim();
+    const text = String(
+      data?.output_text ||
+      (data?.steps || [])
+        .filter(step => step?.type === "model_output")
+        .flatMap(step => step?.content || [])
+        .filter(part => part?.type === "text")
+        .map(part => part?.text || "")
+        .join("")
+    ).trim();
     if (!text) return respond(422, { error: "Gemini tidak menghasilkan teks. Coba crop lebih dekat atau gunakan foto lebih jelas." });
     return respond(200, { text, stage });
   } catch (error) {
