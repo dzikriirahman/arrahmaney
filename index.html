@@ -660,7 +660,7 @@
                     suffix = [{token:last[0],index:Math.max(0,line.slice(0,last.index).trim().split(/\s+/).length),value:normalizeReceiptMoney(last[0])}];
                 }
                 const last = suffix[suffix.length-1];
-                const amount = last.value;
+                let amount = last.value;
                 if (!amount || amount < 1) return;
                 let qty = 1, unitPrice = '', unit = 'pcs', needsReview = false;
                 const flags = [];
