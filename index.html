@@ -910,6 +910,16 @@
             }
         }
 
+        function historyDescription(trx) {
+            const note = String(trx.keterangan || '');
+            if (note.startsWith('[DETAIL_STRUK]')) {
+                const detail = parseSavedReceipt(trx);
+                const count = Array.isArray(detail.items) ? detail.items.length : 0;
+                return 'Struk kulakan' + (detail.supplier ? ' • ' + receiptEsc(detail.supplier) : '') + (detail.invoice ? ' • Inv. ' + receiptEsc(detail.invoice) : '') + ' • ' + count + ' item';
+            }
+            return note || '-';
+        }
+
         function renderHistoryTable() {
             const tbody = document.getElementById('history-table-body');
             if (!tbody) return;
@@ -933,7 +943,7 @@
                     <td class="p-4 text-slate-600 whitespace-nowrap text-xs font-medium">${dateStr}</td>
                     <td class="p-4"><span class="px-2.5 py-1 text-xs rounded-full ${badgeColor} capitalize font-semibold">${trx.jenis}</span></td>
                     <td class="p-4 text-slate-800 font-semibold text-sm">${trx.kategori}</td>
-                    <td class="p-4 text-slate-600 text-xs">${trx.keterangan || '-'}</td>
+                    <td class="p-4 text-slate-600 text-xs">${historyDescription(trx)}</td>
                     <td class="p-4 text-right font-extrabold ${nominalColor} whitespace-nowrap text-sm">${sign} ${formatRupiah(trx.nominal)}</td>
                     <td class="p-4 text-center">
                         <button onclick="deleteTransaction('${trx.id}')" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg transition-colors" title="Hapus">
