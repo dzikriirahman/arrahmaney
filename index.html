@@ -523,7 +523,14 @@
         });
         window.setReceiptOcrStage = function(stage) {
             if (!receiptOcrStages[stage]) return;
+            const changingStage = receiptOcrStage !== stage;
             receiptOcrStage = stage;
+            if (changingStage) {
+                window.selectedReceiptFile = null;
+                ['receipt-camera-file','receipt-gallery-file'].forEach(id => { const input=document.getElementById(id); if(input) input.value=''; });
+                const preview=document.getElementById('receipt-preview');
+                if(preview){preview.removeAttribute('src');preview.classList.add('hidden');}
+            }
             document.querySelectorAll('[data-ocr-stage]').forEach(btn => {
                 const active = btn.dataset.ocrStage === stage;
                 btn.className = 'receipt-ocr-stage rounded-lg border px-3 py-2 text-xs font-semibold ' + (active ? 'border-emerald-700 bg-emerald-700 text-white' : (receiptOcrCompleted[btn.dataset.ocrStage] ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-700'));
