@@ -509,12 +509,12 @@
             const body = document.getElementById('receipt-items-body');
             if (!body) return;
             if (!receiptItems.length) { body.innerHTML = '<tr><td colspan="5" class="p-5 text-center text-slate-400">Belum ada item. Jalankan deteksi struk atau tambah item.</td></tr>'; return; }
-            body.innerHTML = receiptItems.map((item,i) => \`<tr class="border-b border-slate-100">
-                <td data-label="Nama barang" class="p-2"><input aria-label="Nama barang \${i+1}" value="\${receiptEsc(item.name)}" onchange="updateReceiptItem(\${i},'name',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2" placeholder="Nama barang"></td>
-                <td data-label="Jumlah" class="p-2"><input aria-label="Jumlah \${i+1}" type="number" min="0" step="any" value="\${receiptEsc(item.qty)}" onchange="updateReceiptItem(\${i},'qty',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2"></td>
-                <td data-label="Satuan" class="p-2"><input aria-label="Satuan \${i+1}" value="\${receiptEsc(item.unit)}" onchange="updateReceiptItem(\${i},'unit',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2" placeholder="pcs/dus/kg"></td>
-                <td data-label="Total item (Rp)" class="p-2"><input aria-label="Total item rupiah \${i+1}" type="number" min="0" value="\${receiptEsc(item.amount)}" onchange="updateReceiptItem(\${i},'amount',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2 text-right"></td>
-                <td data-label="Aksi" class="p-2 text-center"><button type="button" onclick="removeReceiptItem(\${i})" class="text-rose-500 hover:text-rose-700" aria-label="Hapus item"><i class="fas fa-trash"></i></button></td></tr>\`).join('');
+            body.innerHTML = receiptItems.map((item,i) => `<tr class="border-b border-slate-100">
+                <td data-label="Nama barang" class="p-2"><input aria-label="Nama barang ${i+1}" value="${receiptEsc(item.name)}" onchange="updateReceiptItem(${i},'name',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2" placeholder="Nama barang"></td>
+                <td data-label="Jumlah" class="p-2"><input aria-label="Jumlah ${i+1}" type="number" min="0" step="any" value="${receiptEsc(item.qty)}" onchange="updateReceiptItem(${i},'qty',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2"></td>
+                <td data-label="Satuan" class="p-2"><input aria-label="Satuan ${i+1}" value="${receiptEsc(item.unit)}" onchange="updateReceiptItem(${i},'unit',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2" placeholder="pcs/dus/kg"></td>
+                <td data-label="Total item (Rp)" class="p-2"><input aria-label="Total item rupiah ${i+1}" type="number" min="0" value="${receiptEsc(item.amount)}" onchange="updateReceiptItem(${i},'amount',this.value)" class="w-full min-w-0 rounded-lg border border-slate-200 px-2 py-2 text-right"></td>
+                <td data-label="Aksi" class="p-2 text-center"><button type="button" onclick="removeReceiptItem(${i})" class="text-rose-500 hover:text-rose-700" aria-label="Hapus item"><i class="fas fa-trash"></i></button></td></tr>`).join('');
         }
         window.updateReceiptItem = (i,key,value) => { if (!receiptItems[i]) return; receiptItems[i][key] = key === 'qty' || key === 'amount' ? (Number(value) || 0) : value; };
         window.removeReceiptItem = i => { receiptItems.splice(i,1); renderReceiptItems(); };
