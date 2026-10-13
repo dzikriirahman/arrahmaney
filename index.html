@@ -26,7 +26,7 @@
           header .container { padding:12px 12px 0; gap:10px; }
           header .container>div:first-child { min-width:0; max-width:100%; }
           header .container>div:first-child h1 { white-space:normal; font-size:14px; letter-spacing:.01em; }
-          .mobile-tab-nav { position:fixed; left:0; right:0; bottom:0; z-index:40; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:2px; width:100%; margin:0; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid #e2e8f0; background:rgba(255,255,255,.97); backdrop-filter:blur(16px); box-shadow:0 -5px 20px rgba(15,23,42,.08); }
+          .mobile-tab-nav { position:fixed; left:0; right:0; bottom:0; z-index:40; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:2px; width:100%; margin:0; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid #e2e8f0; background:rgba(255,255,255,.97); backdrop-filter:blur(16px); box-shadow:0 -5px 20px rgba(15,23,42,.08); }
           .mobile-tab-nav .tab-btn { min-width:0; padding:9px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; border-radius:12px; color:#64748b; font-size:10px; line-height:1.1; white-space:normal; }
           .mobile-tab-nav .tab-btn i { margin:0; font-size:16px; }
           .mobile-tab-nav .tab-btn.bg-emerald-700,.mobile-tab-nav .tab-btn.active-tab { background:#ecfdf5; color:#047857; }
@@ -68,9 +68,67 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Login & keamanan */
+        .auth-locked header, .auth-locked main { visibility:hidden; }
+        #login-screen { position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center; padding:16px; background:linear-gradient(135deg,#064e3b 0%,#0f766e 55%,#134e4a 100%); overflow-y:auto; }
+        #login-screen.hidden { display:none; }
+        /* Dashboard penasihat */
+        .adv-card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+        .adv-kicker { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#94a3b8; }
+        .adv-delta-up { color:#059669; } .adv-delta-down { color:#e11d48; } .adv-delta-flat { color:#64748b; }
+        .adv-bar { height:8px; border-radius:999px; background:#e2e8f0; overflow:hidden; }
+        .adv-bar > span { display:block; height:100%; border-radius:999px; transition:width .5s ease; }
+        .adv-insight { border-left-width:4px; }
+        .adv-table th { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:#64748b; background:#f8fafc; padding:10px 12px; text-align:right; white-space:nowrap; }
+        .adv-table th:first-child, .adv-table td:first-child { text-align:left; position:sticky; left:0; background:inherit; }
+        .adv-table td { padding:9px 12px; text-align:right; white-space:nowrap; font-size:12px; border-top:1px solid #f1f5f9; }
+        .adv-table tbody tr:nth-child(even) { background:#fafafa; }
+        .adv-table tbody tr:nth-child(odd) { background:#fff; }
+        @media(max-width:767px) { #user-email { display:none; } }
     </style>
 </head>
-<body class="text-slate-800 antialiased min-h-screen md:h-screen flex flex-col md:overflow-hidden">
+<body class="auth-locked text-slate-800 antialiased min-h-screen md:h-screen flex flex-col md:overflow-hidden">
+    <!-- LOGIN: aplikasi baru memuat data setelah pengguna berhasil masuk -->
+    <div id="login-screen" role="dialog" aria-modal="true" aria-labelledby="login-title">
+        <div class="w-full max-w-md">
+            <div class="text-center text-white mb-6">
+                <div class="mx-auto w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mb-4"><i class="fas fa-store text-3xl text-emerald-200"></i></div>
+                <h1 id="login-title" class="text-2xl font-extrabold tracking-wide">TOKO GROSIR AR-RAHMAN</h1>
+                <p class="text-sm text-emerald-100 mt-1">Sistem Keuangan &amp; Manajemen Bisnis</p>
+            </div>
+
+            <!-- Tampilan: masuk -->
+            <form id="login-form" class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8" novalidate>
+                <h2 class="text-lg font-bold text-slate-900">Masuk</h2>
+                <p class="text-xs text-slate-500 mb-5">Hanya untuk pengguna terdaftar. Hubungi pemilik toko jika belum punya akun.</p>
+                <label for="login-email" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Email</label>
+                <input id="login-email" type="email" autocomplete="username" inputmode="email" required class="w-full mb-4 px-3.5 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="nama@email.com">
+                <label for="login-password" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Password</label>
+                <div class="relative mb-2">
+                    <input id="login-password" type="password" autocomplete="current-password" required class="w-full px-3.5 py-3 pr-12 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Password">
+                    <button type="button" id="login-toggle-pass" class="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 text-slate-400 hover:text-slate-700" aria-label="Tampilkan password"><i class="fas fa-eye"></i></button>
+                </div>
+                <div class="flex justify-end mb-4"><button type="button" id="login-forgot" class="text-xs font-semibold text-emerald-700 hover:underline">Lupa password?</button></div>
+                <p id="login-message" class="hidden mb-4 rounded-xl px-3 py-2.5 text-xs font-semibold" role="alert"></p>
+                <button type="submit" id="login-submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md transition-all"><i class="fas fa-sign-in-alt mr-2"></i>Masuk</button>
+            </form>
+
+            <!-- Tampilan: password baru (setelah klik tautan reset di email) -->
+            <form id="recovery-form" class="hidden bg-white rounded-2xl shadow-2xl p-6 sm:p-8" novalidate>
+                <h2 class="text-lg font-bold text-slate-900">Buat password baru</h2>
+                <p class="text-xs text-slate-500 mb-5">Gunakan minimal 8 karakter.</p>
+                <label for="recovery-password" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Password baru</label>
+                <input id="recovery-password" type="password" autocomplete="new-password" minlength="8" class="w-full mb-4 px-3.5 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                <label for="recovery-password2" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Ulangi password baru</label>
+                <input id="recovery-password2" type="password" autocomplete="new-password" minlength="8" class="w-full mb-4 px-3.5 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                <p id="recovery-message" class="hidden mb-4 rounded-xl px-3 py-2.5 text-xs font-semibold" role="alert"></p>
+                <button type="submit" id="recovery-submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md transition-all">Simpan password</button>
+            </form>
+
+            <p id="login-boot" class="hidden text-center text-xs text-emerald-100 mt-4">Memeriksa sesi…</p>
+        </div>
+    </div>
 
     <!-- Header / Branding -->
     <header class="bg-emerald-900 text-white shadow-lg z-20 flex-shrink-0 border-b border-emerald-800">
@@ -100,12 +158,20 @@
                 <button onclick="switchTab('history')" class="tab-btn px-4 py-2 rounded-lg hover:bg-emerald-800/60 transition-all text-sm font-medium text-emerald-200 flex items-center gap-2" data-target="history">
                     <i class="fas fa-history"></i>Riwayat & Buku Besar
                 </button>
+                <button onclick="switchTab('debts')" class="tab-btn px-4 py-2 rounded-lg hover:bg-emerald-800/60 transition-all text-sm font-medium text-emerald-200 flex items-center gap-2" data-target="debts">
+                    <i class="fas fa-handshake"></i>Hutang & Piutang
+                </button>
             </nav>
+            <div id="user-box" class="flex items-center gap-2 ml-auto md:ml-0">
+                <span id="user-email" class="text-xs text-emerald-200 font-medium max-w-[180px] truncate"></span>
+                <button type="button" onclick="window.appSignOut && appSignOut()" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5" title="Keluar dari akun"><i class="fas fa-sign-out-alt"></i><span>Keluar</span></button>
+            </div>
             <nav class="mobile-tab-nav md:hidden flex gap-1 overflow-x-auto mt-3 pt-2 border-t border-emerald-800/70 w-full">
                 <button onclick="switchTab('dashboard')" class="tab-btn whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-700 text-white" data-target="dashboard"><i class="fas fa-chart-pie mr-1"></i>Dashboard</button>
                 <button onclick="switchTab('input')" class="tab-btn whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-200" data-target="input"><i class="fas fa-plus-circle mr-1"></i>Input</button>
                 <button onclick="switchTab('expenses')" class="tab-btn whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-200" data-target="expenses"><i class="fas fa-receipt mr-1"></i>Detail Struk</button>
                 <button onclick="switchTab('history')" class="tab-btn whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-200" data-target="history"><i class="fas fa-history mr-1"></i>Riwayat</button>
+                <button onclick="switchTab('debts')" class="tab-btn whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-200" data-target="debts"><i class="fas fa-handshake mr-1"></i>Hutang</button>
             </nav>
         </div>
     </header>
@@ -114,136 +180,9 @@
     <main class="flex-grow overflow-y-auto p-3 sm:p-4 md:p-8 container mx-auto w-full max-w-full">
         <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
 
-        <!-- DASHBOARD TAB -->
+        <!-- DASHBOARD TAB (diisi oleh advisor.js) -->
         <div id="dashboard" class="tab-content fade-in block">
-
-            <!-- Executive Header Banner -->
-            <div class="bg-gradient-to-r from-emerald-800 to-teal-900 rounded-2xl shadow-sm text-white p-6 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border border-emerald-700/50">
-                <div>
-                    <div class="flex items-center gap-2 mb-1">
-                        <span id="health-badge" class="bg-emerald-600 text-white text-[11px] px-3 py-0.5 rounded-full font-bold uppercase tracking-wider border border-emerald-500">Menganalisis Performa...</span>
-                        <span class="text-xs text-emerald-200">• Real-time Cloud Supabase</span>
-                    </div>
-                    <h2 class="text-2xl font-bold tracking-tight">Ringkasan Eksekutif Keuangan Toko</h2>
-                    <p class="text-xs text-emerald-100 mt-0.5">Pantau arus kas, margin keuntungan, dan pengeluaran operasional grosir Anda.</p>
-                </div>
-                <button onclick="loadDataFromSupabase()" class="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-all border border-white/20 flex items-center gap-2 backdrop-blur-sm">
-                    <i class="fas fa-sync-alt"></i> Sinkronisasi Data Cloud
-                </button>
-            </div>
-
-            <!-- KPI Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div class="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 border-l-4 border-l-blue-600 flex items-center justify-between">
-                    <div>
-                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Kas Likuid</p>
-                        <h3 id="summary-saldo" class="text-xl lg:text-2xl font-extrabold text-slate-900">Rp 0</h3>
-                        <p class="text-[10px] text-slate-400 mt-1">Saldo bersih di tangan</p>
-                    </div>
-                    <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-inner">
-                        <i class="fas fa-wallet text-xl"></i>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 border-l-4 border-l-emerald-600 flex items-center justify-between">
-                    <div>
-                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Pemasukan</p>
-                        <h3 id="summary-pemasukan" class="text-xl lg:text-2xl font-extrabold text-emerald-600">Rp 0</h3>
-                        <p class="text-[10px] text-emerald-600 mt-1 font-medium">Akumulasi penjualan grosir & eceran</p>
-                    </div>
-                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner">
-                        <i class="fas fa-arrow-down text-xl"></i>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 border-l-4 border-l-rose-600 flex items-center justify-between">
-                    <div>
-                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Pengeluaran</p>
-                        <h3 id="summary-pengeluaran" class="text-xl lg:text-2xl font-extrabold text-rose-600">Rp 0</h3>
-                        <p class="text-[10px] text-rose-600 mt-1 font-medium">Kulakan & biaya operasional</p>
-                    </div>
-                    <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shadow-inner">
-                        <i class="fas fa-arrow-up text-xl"></i>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 border-l-4 border-l-indigo-600 flex items-center justify-between">
-                    <div>
-                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Estimasi Laba Bersih</p>
-                        <h3 id="summary-profit" class="text-xl lg:text-2xl font-extrabold text-indigo-600">Rp 0</h3>
-                        <p id="summary-margin" class="text-[10px] text-indigo-600 mt-1 font-medium">Margin: 0%</p>
-                    </div>
-                    <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner">
-                        <i class="fas fa-chart-line text-xl"></i>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Business Insights & Advisory Widgets -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-lightbulb text-lg"></i>
-                    </div>
-                    <div>
-                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Rekomendasi Penasihat</h4>
-                        <p id="advisor-tip" class="text-xs font-semibold text-slate-700 mt-0.5">Memuat analisis bisnis...</p>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-box-open text-lg"></i>
-                    </div>
-                    <div>
-                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Volume Transaksi</h4>
-                        <p id="insight-trx-count" class="text-xs font-semibold text-slate-700 mt-0.5">0 transaksi tercatat</p>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-balance-scale text-lg"></i>
-                    </div>
-                    <div>
-                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Rasio Pengeluaran Kas</h4>
-                        <p id="insight-expense-ratio" class="text-xs font-semibold text-slate-700 mt-0.5">0% dari pemasukan</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Grafik Tren Komprehensif (Line Chart) & Komposisi -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <!-- Line Chart Tren Keuangan & Profit dengan Filter Waktu -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-slate-800 text-sm uppercase tracking-wider flex items-center gap-2">
-                            <i class="fas fa-chart-line text-emerald-600"></i> Tren Kinerja & Profit
-                        </h3>
-                        <select id="chart-filter" onchange="updateDashboard()" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
-                            <option value="monthly">Bulanan</option>
-                            <option value="daily">Harian</option>
-                            <option value="yearly">Tahunan</option>
-                        </select>
-                    </div>
-                    <div class="relative h-64">
-                        <canvas id="financialTrendChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Komposisi Finansial Kategori -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-slate-800 text-sm uppercase tracking-wider flex items-center gap-2">
-                            <i class="fas fa-chart-pie text-indigo-600"></i> Komposisi Kategori
-                        </h3>
-                        <span class="text-xs text-slate-400 font-medium">Distribusi Keseluruhan</span>
-                    </div>
-                    <div class="relative h-64 flex justify-center">
-                        <canvas id="categoryChart"></canvas>
-                    </div>
-                </div>
-            </div>
+            <div id="advisor-root"><p class="p-6 text-sm text-slate-400">Memuat dashboard…</p></div>
         </div>
 
         <!-- INPUT TAB -->
@@ -388,6 +327,8 @@
                 </button>
             </div>
 
+            <div id="history-filters"></div>
+
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="history-desktop-table overflow-x-auto">
                     <table class="w-full text-left border-collapse">
@@ -408,6 +349,11 @@
                 </div>
                 <div id="history-mobile-list" class="hidden md:hidden p-3 space-y-3"></div>
             </div>
+        </div>
+
+        <!-- HUTANG & PIUTANG TAB (diisi oleh advisor.js) -->
+        <div id="debts" class="tab-content fade-in hidden max-w-5xl mx-auto">
+            <div id="debts-root"></div>
         </div>
     </main>
 
@@ -437,7 +383,7 @@
             if (tanggalEl) tanggalEl.valueAsDate = new Date();
             updateKategoriOptions();
             if (supabaseClient) {
-                loadDataFromSupabase();
+                if (window.initAuth) window.initAuth(); // data dimuat setelah login berhasil
             } else {
                 showToast("SDK Supabase gagal dimuat!", "error");
             }
@@ -458,7 +404,8 @@
                 }
             });
 
-            if(tabId === 'history') renderHistoryTable();
+            if(tabId === 'debts' && window.renderDebtsTab) window.renderDebtsTab();
+            if(tabId === 'history') { if (window.renderHistoryFilters) window.renderHistoryFilters(); renderHistoryTable(); }
             if(tabId === 'expenses') renderReceiptHistory();
             if(tabId === 'dashboard') {
                 setTimeout(() => { updateDashboard(); }, 100);
@@ -897,7 +844,7 @@
             if (status) status.textContent = 'Menyiapkan foto struk…';
             const bitmap = await createImageBitmap(file);
             try {
-                const maxSide = 1800;
+                const maxSide = 1600;
                 const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
                 const canvas = document.createElement('canvas');
                 canvas.width = Math.max(1, Math.round(bitmap.width * scale));
@@ -947,6 +894,7 @@
             if (button) { button.disabled = true; button.classList.add('opacity-60'); }
             let controller;
             let timeoutId;
+            let tickerId;
             try {
                 if (status) status.textContent = 'Mulai membaca foto…';
                 // Allow the browser to paint the status before image processing begins.
@@ -954,36 +902,54 @@
                 const blob = await prepareGeminiReceiptImage(file, status);
                 if (status) status.textContent = 'Foto siap. Menyiapkan data untuk Gemini AI…';
                 const imageBase64 = await geminiBlobToBase64(blob);
-                if (status) status.textContent = 'Mengirim foto ke Gemini AI. Mohon tunggu…';
                 controller = new AbortController();
-                timeoutId = setTimeout(() => controller.abort(), 60000);
+                timeoutId = setTimeout(() => controller.abort(), 40000);
+                const startedAt = Date.now();
+                if (status) status.textContent = 'Mengirim foto ke Gemini AI. Mohon tunggu… (0 dtk)';
+                tickerId = setInterval(() => {
+                    if (status) status.textContent = 'Menunggu balasan Gemini AI… (' + Math.round((Date.now() - startedAt) / 1000) + ' dtk, batas 40 dtk)';
+                }, 1000);
+                const authHeaders = { 'Content-Type':'application/json' };
+                try {
+                    const sessionResult = await supabaseClient.auth.getSession();
+                    const accessToken = sessionResult && sessionResult.data && sessionResult.data.session && sessionResult.data.session.access_token;
+                    if (accessToken) authHeaders.Authorization = 'Bearer ' + accessToken;
+                } catch (_) {}
                 const response = await fetch('/.netlify/functions/gemini-receipt-ocr', {
                     method:'POST',
-                    headers:{'Content-Type':'application/json'},
+                    headers:authHeaders,
                     body:JSON.stringify({ imageBase64:imageBase64, mimeType:'image/jpeg', stage:receiptOcrStage }),
                     signal:controller.signal
                 });
+                // Netlify mengembalikan halaman teks/HTML (bukan JSON) saat fungsi habis waktu atau tidak ditemukan.
+                const rawBody = await response.text();
                 let payload = {};
-                try { payload = await response.json(); } catch (_) {}
-                if (!response.ok) throw new Error(payload.error || 'Layanan Gemini gagal (' + response.status + ').');
+                try { payload = JSON.parse(rawBody); } catch (_) {}
+                if (!response.ok) {
+                    if (response.status === 401) throw new Error(payload.error || 'Sesi login berakhir. Silakan masuk kembali.');
+                    if (response.status === 404) throw new Error('Fungsi OCR tidak ditemukan di server. Pastikan folder netlify/functions ikut ter-deploy.');
+                    if (!payload.error && (response.status === 502 || response.status === 504)) throw new Error('Server Netlify memutus fungsi OCR karena terlalu lama (HTTP ' + response.status + '). Crop foto lebih dekat lalu coba lagi.');
+                    throw new Error((payload.error || 'Layanan OCR gagal (HTTP ' + response.status + ').') + (payload.detail ? ' [' + payload.detail + ']' : ''));
+                }
                 const text = String(payload.text || '').trim();
                 if (!text) throw new Error('Gemini tidak menghasilkan teks. Coba crop lebih dekat atau gunakan foto lebih jelas.');
                 if (rawText) rawText.value = text;
                 if (status) status.textContent = 'Teks mentah tahap ' + stage.label.toLowerCase() + ' siap diedit. Periksa hasilnya, lalu tekan “Terapkan Hasil Tahap Ini”.';
                 showToast('Gemini selesai membaca ' + stage.label.toLowerCase() + '. Periksa teks mentah sebelum menerapkan.','success');
                 if (receiptOcrStage === 'name' && !document.getElementById('receipt-supplier').value) {
-                    const first = text.split(/\\n+/).map(x=>x.trim()).find(x=>x.length>2 && x.length<55 && /[a-zA-Z]/.test(x) && !/invoice|faktur|nota|tanggal|telp|total/i.test(x));
+                    const first = text.split(/\n+/).map(x=>x.trim()).find(x=>x.length>2 && x.length<55 && /[a-zA-Z]/.test(x) && !/invoice|faktur|nota|tanggal|telp|total/i.test(x));
                     if (first && /supplier|toko|grosir/i.test(first)) document.getElementById('receipt-supplier').value = first;
                 }
             } catch (err) {
                 console.error('Gemini receipt OCR error:',err);
                 const message = err && err.name === 'AbortError'
-                    ? 'Permintaan Gemini melewati batas 60 detik. Coba foto yang sudah di-crop; jika berulang, periksa log Netlify Function.'
+                    ? 'Tidak ada balasan dari server dalam 40 detik. Crop foto lebih dekat ke bagian struk lalu coba lagi; jika berulang, buka Netlify > Logs > Functions untuk melihat penyebabnya.'
                     : (err && err.message ? err.message : 'kesalahan tidak diketahui');
                 if (status) status.textContent = 'OCR Gemini gagal: ' + message;
                 showToast(message,'error');
             } finally {
                 if (timeoutId) clearTimeout(timeoutId);
+                if (tickerId) clearInterval(tickerId);
                 if (button) { button.disabled = false; button.classList.remove('opacity-60'); }
             }
         };
@@ -1153,6 +1119,7 @@
         };
 
         function updateDashboard() {
+            if (window.renderAdvisorDashboard) { window.renderAdvisorDashboard(); return; }
             let totalSaldo = 0, totalPemasukan = 0, totalPengeluaran = 0;
 
             transactions.forEach(trx => {
@@ -1354,7 +1321,14 @@
                 if (mobileList) mobileList.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">Belum ada transaksi.</div>';
                 return;
             }
-            transactions.forEach(trx => {
+            const historyList = window.getHistoryFiltered ? window.getHistoryFiltered() : transactions;
+            if (window.updateHistorySummary) window.updateHistorySummary(historyList);
+            if (historyList.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Tidak ada transaksi yang cocok dengan filter.</td></tr>';
+                if (mobileList) mobileList.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">Tidak ada transaksi yang cocok.</div>';
+                return;
+            }
+            historyList.forEach(trx => {
                 const isPemasukan = trx.jenis === 'pemasukan';
                 const badgeColor = isPemasukan ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700';
                 const nominalColor = isPemasukan ? 'text-emerald-600' : 'text-rose-600';
@@ -1452,5 +1426,7 @@
       </div>
     </div>
 
+    <script src="auth.js"></script>
+    <script src="advisor.js"></script>
 </body>
 </html>
