@@ -166,7 +166,7 @@
   /* ---------- Tab bar bawah ---------- */
   body .mobile-tab-nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-    display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0;
+    display: grid !important; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0;
     width: 100%; margin: 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
     background: var(--m-glass);
     -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px);
