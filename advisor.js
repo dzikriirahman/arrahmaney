@@ -580,11 +580,11 @@
     if (!root || root.getAttribute('data-ready')) return root;
     root.setAttribute('data-ready', '1');
     root.innerHTML =
-      '<div class="bg-gradient-to-r from-emerald-800 to-teal-900 rounded-2xl shadow-sm text-white p-5 md:p-6 mb-5 border border-emerald-700/50">' +
+      '<div class="adv-hero bg-gradient-to-r from-emerald-800 to-teal-900 rounded-2xl shadow-sm text-white p-5 md:p-6 mb-5 border border-emerald-700/50">' +
         '<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">' +
           '<div><h2 class="text-xl md:text-2xl font-bold tracking-tight">Ruang Kendali Bisnis</h2>' +
           '<p id="adv-subtitle" class="text-xs text-emerald-100 mt-1"></p></div>' +
-          '<div class="flex flex-wrap items-center gap-2">' +
+          '<div class="adv-hero-actions flex flex-wrap items-center gap-2">' +
             '<select id="adv-period" class="px-3 py-2 bg-white/10 border border-white/25 rounded-xl text-xs font-semibold text-white outline-none cursor-pointer">' +
               PERIODS.map(p => '<option class="text-slate-900" value="' + p[0] + '">' + p[1] + '</option>').join('') + '</select>' +
             '<button type="button" id="adv-targets-btn" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/25 rounded-xl text-xs font-semibold flex items-center gap-1.5"><i class="fas fa-bullseye"></i>Target</button>' +
@@ -980,7 +980,7 @@
     box.setAttribute('data-ready', '1');
     const input = 'px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500';
     box.innerHTML = '<div class="adv-card p-4 mb-4"><div class="grid grid-cols-2 lg:grid-cols-6 gap-2">' +
-      '<input id="hf-q" type="search" placeholder="Cari kategori, catatan, supplier, barang…" class="col-span-2 ' + input + '">' +
+      '<input id="hf-q" type="search" placeholder="Cari transaksi…" class="col-span-2 ' + input + '">' +
       '<select id="hf-jenis" class="' + input + '"><option value="">Semua jenis</option><option value="pemasukan">Pemasukan</option><option value="pengeluaran">Pengeluaran</option></select>' +
       '<select id="hf-kat" class="' + input + '"></select>' +
       '<input id="hf-from" type="date" aria-label="Dari tanggal" class="' + input + '"><input id="hf-to" type="date" aria-label="Sampai tanggal" class="' + input + '"></div>' +
@@ -1040,7 +1040,7 @@
       .sort((a, b) => (a.jatuh_tempo || '9999').localeCompare(b.jatuh_tempo || '9999'));
     const input = 'w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500';
     root.innerHTML =
-      '<div class="adv-card p-5 mb-4"><div class="flex items-center gap-3 mb-1"><div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><i class="fas fa-handshake text-lg"></i></div><div><h2 class="text-xl font-bold text-slate-900">Hutang &amp; Piutang</h2><p class="text-xs text-slate-500">Pantau uang yang belum diterima dari pelanggan dan kewajiban ke supplier.</p></div></div></div>' +
+      '<div class="m-dup-head adv-card p-5 mb-4"><div class="flex items-center gap-3 mb-1"><div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><i class="fas fa-handshake text-lg"></i></div><div><h2 class="text-xl font-bold text-slate-900">Hutang &amp; Piutang</h2><p class="text-xs text-slate-500">Pantau uang yang belum diterima dari pelanggan dan kewajiban ke supplier.</p></div></div></div>' +
       '<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">' +
         kpi({ label: 'Piutang belum lunas', value: rp(r.piutang), sub: 'Terlambat ' + rp(r.piutangOverdue), icon: 'fa-hand-holding-dollar', color: '#2563eb' }) +
         kpi({ label: 'Hutang belum lunas', value: rp(r.hutang), sub: 'Terlambat ' + rp(r.hutangOverdue), icon: 'fa-file-invoice-dollar', color: '#e11d48' }) +
