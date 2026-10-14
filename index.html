@@ -2,7 +2,16 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#fbfcfb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="AR-Rahman">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
     <title>Pencatatan Keuangan Cloud | Toko Grosir AR-Rahman</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -11,6 +20,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+    <link rel="stylesheet" href="mobile.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 
     <style>
@@ -26,10 +36,6 @@
           header .container { padding:12px 12px 0; gap:10px; }
           header .container>div:first-child { min-width:0; max-width:100%; }
           header .container>div:first-child h1 { white-space:normal; font-size:14px; letter-spacing:.01em; }
-          .mobile-tab-nav { position:fixed; left:0; right:0; bottom:0; z-index:40; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:2px; width:100%; margin:0; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid #e2e8f0; background:rgba(255,255,255,.97); backdrop-filter:blur(16px); box-shadow:0 -5px 20px rgba(15,23,42,.08); }
-          .mobile-tab-nav .tab-btn { min-width:0; padding:9px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; border-radius:12px; color:#64748b; font-size:10px; line-height:1.1; white-space:normal; }
-          .mobile-tab-nav .tab-btn i { margin:0; font-size:16px; }
-          .mobile-tab-nav .tab-btn.bg-emerald-700,.mobile-tab-nav .tab-btn.active-tab { background:#ecfdf5; color:#047857; }
           .tab-content { width:100%; min-width:0; }
           .tab-content>div,.tab-content section { min-width:0; max-width:100%; }
           .rounded-2xl { border-radius:16px; }
@@ -131,7 +137,7 @@
     </div>
 
     <!-- Header / Branding -->
-    <header class="bg-emerald-900 text-white shadow-lg z-20 flex-shrink-0 border-b border-emerald-800">
+    <header id="app-bar" class="bg-emerald-900 text-white shadow-lg z-20 flex-shrink-0 border-b border-emerald-800">
         <div class="container mx-auto px-3 md:px-6 py-3 md:py-3.5 flex justify-between items-center gap-2 flex-wrap">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-emerald-800 border border-emerald-700 flex items-center justify-center shadow-inner">
@@ -139,7 +145,7 @@
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="font-bold text-sm sm:text-base md:text-lg tracking-wide leading-tight">TOKO GROSIR AR-RAHMAN</h1>
+                        <h1 class="font-bold text-sm sm:text-base md:text-lg tracking-wide leading-tight"><span class="hidden md:inline">TOKO GROSIR AR-RAHMAN</span><span class="md:hidden">Toko AR-Rahman</span></h1>
                         <span class="hidden sm:inline bg-emerald-700/80 text-emerald-100 text-[10px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider border border-emerald-600">Cloud Connected</span>
                     </div>
                     <p class="hidden sm:block text-xs text-emerald-300 font-medium">Pusat Kebutuhan Sehari-hari • Sistem Intelijen Finansial</p>
@@ -164,20 +170,14 @@
             </nav>
             <div id="user-box" class="flex items-center gap-2 ml-auto md:ml-0">
                 <span id="user-email" class="text-xs text-emerald-200 font-medium max-w-[180px] truncate"></span>
-                <button type="button" onclick="window.appSignOut && appSignOut()" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5" title="Keluar dari akun"><i class="fas fa-sign-out-alt"></i><span>Keluar</span></button>
+                <button type="button" onclick="window.appSignOut && appSignOut()" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5" title="Keluar dari akun" aria-label="Keluar dari akun"><i class="fas fa-sign-out-alt"></i><span class="m-hide-label">Keluar</span></button>
             </div>
-            <nav class="mobile-tab-nav md:hidden flex gap-1 overflow-x-auto mt-3 pt-2 border-t border-emerald-800/70 w-full">
-                <button onclick="switchTab('dashboard')" class="tab-btn whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-700 text-white" data-target="dashboard"><i class="fas fa-chart-pie mr-1"></i>Dashboard</button>
-                <button onclick="switchTab('input')" class="tab-btn whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-200" data-target="input"><i class="fas fa-plus-circle mr-1"></i>Input</button>
-                <button onclick="switchTab('expenses')" class="tab-btn whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-200" data-target="expenses"><i class="fas fa-receipt mr-1"></i>Detail Struk</button>
-                <button onclick="switchTab('history')" class="tab-btn whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-200" data-target="history"><i class="fas fa-history mr-1"></i>Riwayat</button>
-                <button onclick="switchTab('debts')" class="tab-btn whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-200" data-target="debts"><i class="fas fa-handshake mr-1"></i>Hutang</button>
-            </nav>
         </div>
     </header>
 
     <!-- Main Content -->
     <main class="flex-grow overflow-y-auto p-3 sm:p-4 md:p-8 container mx-auto w-full max-w-full">
+        <div id="m-titlebar" class="md:hidden"><h2 id="m-title">Ringkasan</h2><p id="m-subtitle"></p></div>
         <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
 
         <!-- DASHBOARD TAB (diisi oleh advisor.js) -->
@@ -188,7 +188,7 @@
         <!-- INPUT TAB -->
         <div id="input" class="tab-content fade-in hidden max-w-2xl mx-auto">
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
-                <div class="mb-6 pb-4 border-b border-slate-100 flex items-center gap-3">
+                <div class="m-dup-head mb-6 pb-4 border-b border-slate-100 flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                         <i class="fas fa-file-invoice-dollar text-lg"></i>
                     </div>
@@ -241,7 +241,7 @@
         <!-- DETAIL PENGELUARAN / OCR STRUK -->
         <div id="expenses" class="tab-content fade-in hidden max-w-5xl mx-auto">
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-7 mb-5">
-                <div class="flex items-center gap-3 mb-5 pb-4 border-b border-slate-100">
+                <div class="m-dup-head flex items-center gap-3 mb-5 pb-4 border-b border-slate-100">
                     <div class="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center"><i class="fas fa-receipt text-xl"></i></div>
                     <div><h2 class="text-xl font-bold text-slate-900">Detail Pengeluaran Kulakan</h2>
                     <p class="text-sm text-slate-500">Foto struk akan dibaca otomatis. Periksa dan koreksi hasil deteksi sebelum disimpan.</p></div>
@@ -312,8 +312,8 @@
 
         <!-- HISTORY TAB -->
         <div id="history" class="tab-content fade-in hidden">
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-4 flex justify-between items-center">
-                <div class="flex items-center gap-3">
+            <div class="m-history-head bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-4 flex justify-between items-center">
+                <div class="m-dup-title flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
                         <i class="fas fa-book text-lg"></i>
                     </div>
@@ -322,7 +322,7 @@
                         <p class="text-xs text-slate-500">Arsip seluruh mutasi kas terpusat dari database Supabase</p>
                     </div>
                 </div>
-                <button onclick="loadDataFromSupabase()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5">
+                <button onclick="loadDataFromSupabase()" class="m-refresh px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5">
                     <i class="fas fa-sync-alt"></i> Refresh Data
                 </button>
             </div>
@@ -1426,7 +1426,18 @@
       </div>
     </div>
 
+
+    <!-- Tab bar bawah (khusus HP). Berada di luar header agar fixed + blur bekerja di iOS Safari. -->
+    <nav class="mobile-tab-nav md:hidden" aria-label="Navigasi utama">
+        <button onclick="switchTab('dashboard')" class="tab-btn active-tab" data-target="dashboard"><i class="fas fa-chart-pie"></i><span>Ringkasan</span></button>
+        <button onclick="switchTab('input')" class="tab-btn" data-target="input"><i class="fas fa-plus-circle"></i><span>Catat</span></button>
+        <button onclick="switchTab('expenses')" class="tab-btn" data-target="expenses"><i class="fas fa-receipt"></i><span>Struk</span></button>
+        <button onclick="switchTab('history')" class="tab-btn" data-target="history"><i class="fas fa-history"></i><span>Riwayat</span></button>
+        <button onclick="switchTab('debts')" class="tab-btn" data-target="debts"><i class="fas fa-handshake"></i><span>Hutang</span></button>
+    </nav>
+
     <script src="auth.js"></script>
     <script src="advisor.js"></script>
+    <script src="mobile.js"></script>
 </body>
 </html>

@@ -1,0 +1,211 @@
+/* Tampilan HP (iPhone) untuk aplikasi keuangan Toko Grosir AR-Rahman.
+   Hanya aktif di bawah 768px; desktop tidak berubah.
+   Bahasa visual: lapisan iOS (app bar kaca, judul besar, kartu putih di atas latar abu-hijau,
+   tab bar bawah dengan safe-area). Satu aksen: hijau zamrud toko. */
+
+:root {
+  --m-ink: #14201b;
+  --m-ink2: #55655d;
+  --m-mute: #86958e;
+  --m-line: #e3e9e5;
+  --m-bg: #f2f5f3;
+  --m-card: #ffffff;
+  --m-brand: #0b7a55;
+  --m-brand-d: #085c41;
+  --m-soft: #e5f3ec;
+  --m-glass: rgba(251, 252, 251, .88);
+}
+
+#m-titlebar { display: none; }
+
+@media (max-width: 767px) {
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, system-ui, sans-serif !important;
+    background: var(--m-bg) !important;
+    color: var(--m-ink);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+  }
+  body button, body a, body select, body [onclick], body label { touch-action: manipulation; }
+  .tab-content { font-variant-numeric: tabular-nums; }
+
+  /* ---------- App bar ---------- */
+  body #app-bar {
+    position: sticky; top: 0; z-index: 30;
+    background: var(--m-glass) !important;
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    color: var(--m-ink) !important;
+    border-bottom: .5px solid var(--m-line) !important;
+    box-shadow: none !important;
+    padding-top: env(safe-area-inset-top);
+  }
+  body #app-bar > .container { padding: 8px 16px !important; min-height: 54px; flex-wrap: nowrap !important; gap: 12px !important; }
+  body #app-bar > .container > div:first-child { min-width: 0; flex: 1 1 auto; }
+  body #app-bar h1 { color: var(--m-ink) !important; font-size: 17px !important; font-weight: 700 !important; letter-spacing: -.012em !important; white-space: nowrap !important; }
+  body #app-bar .w-10.h-10 {
+    width: 34px !important; height: 34px !important; border-radius: 10px !important; border: 0 !important;
+    background: linear-gradient(150deg, #12926a, #0a5f43) !important; box-shadow: 0 1px 3px rgba(8, 92, 65, .35) !important;
+  }
+  body #app-bar .w-10.h-10 i { color: #fff !important; font-size: 15px !important; }
+  body #user-email { display: none !important; }
+  body #user-box { margin-left: 0 !important; flex: 0 0 auto; }
+  body #user-box button {
+    width: 44px; height: 44px; min-height: 0; padding: 0 !important; border-radius: 999px !important;
+    background: var(--m-soft) !important; border: 0 !important; color: var(--m-brand) !important;
+    display: flex; align-items: center; justify-content: center;
+  }
+  body #user-box button:active { background: #d3ebdf !important; }
+  body #user-box .m-hide-label { display: none; }
+
+  /* ---------- Judul besar ---------- */
+  body #m-titlebar { display: block; padding: 10px 4px 14px; }
+  body #m-title { font-size: 32px; line-height: 1.08; font-weight: 800; letter-spacing: -.028em; color: var(--m-ink); margin: 0; }
+  body #m-subtitle { margin: 5px 0 0; font-size: 14px; color: var(--m-ink2); }
+  body #m-subtitle:empty { display: none; }
+
+  body main { padding: 4px 16px 28px !important; }
+
+  /* ---------- Kartu ---------- */
+  body .tab-content > .bg-white,
+  body .tab-content > div > .bg-white,
+  body .adv-card {
+    background: var(--m-card) !important;
+    border: 0 !important;
+    border-radius: 20px !important;
+    box-shadow: 0 1px 2px rgba(16, 32, 24, .05), 0 6px 18px rgba(16, 32, 24, .05) !important;
+  }
+  body .tab-content > .bg-white { margin-bottom: 14px; }
+  /* Kepala kartu yang mengulang judul besar disembunyikan */
+  body .m-dup-head, body .m-dup-title { display: none !important; }
+  body #history .m-history-head { padding: 0 !important; background: transparent !important; box-shadow: none !important; margin-bottom: 12px !important; }
+  body #history .m-refresh { width: 100%; justify-content: center; min-height: 46px; background: #fff !important; color: var(--m-brand) !important; font-size: 14px !important; box-shadow: 0 1px 2px rgba(16, 32, 24, .05), 0 4px 12px rgba(16, 32, 24, .04); }
+
+  body .tab-content .uppercase { text-transform: none !important; }
+  body .tab-content .tracking-wider, body .tab-content .tracking-wide { letter-spacing: 0 !important; }
+  body .adv-kicker { text-transform: none !important; letter-spacing: 0 !important; font-size: 12.5px !important; font-weight: 600 !important; color: var(--m-ink2) !important; }
+  body .adv-card h3, body .tab-content h3 { text-transform: none !important; letter-spacing: -.01em !important; font-size: 16px !important; font-weight: 700 !important; color: var(--m-ink) !important; }
+  body .tab-content h2 { letter-spacing: -.015em; }
+  body .tab-content label { text-transform: none !important; letter-spacing: 0 !important; font-size: 13px !important; font-weight: 600 !important; color: var(--m-ink2) !important; }
+
+  /* ---------- Dashboard ---------- */
+  body .adv-hero {
+    background: linear-gradient(160deg, #108058 0%, #09553d 100%) !important;
+    border: 0 !important; border-radius: 22px !important;
+    padding: 16px !important; margin-bottom: 14px !important;
+    box-shadow: 0 8px 22px rgba(9, 85, 61, .28) !important;
+  }
+  body .adv-hero h2 { display: none; }
+  body .adv-hero #adv-subtitle { margin: 0 0 12px; font-size: 13px; line-height: 1.45; color: rgba(255, 255, 255, .86) !important; }
+  body .adv-hero-actions {
+    flex-wrap: nowrap !important; overflow-x: auto; gap: 8px !important;
+    margin: 0 -16px; padding: 2px 16px 2px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  body .adv-hero-actions::-webkit-scrollbar { display: none; }
+  body .adv-hero-actions > * { flex: 0 0 auto; min-height: 42px; border-radius: 999px !important; font-size: 14px !important; padding: 0 16px !important; white-space: nowrap; }
+  body .adv-hero-actions select { padding-right: 8px !important; background-color: rgba(255, 255, 255, .18) !important; }
+  body .adv-hero-actions button { background: rgba(255, 255, 255, .14) !important; }
+  body .adv-hero-actions button:active { background: rgba(255, 255, 255, .28) !important; }
+
+  body #advisor-root .grid { gap: 12px !important; }
+  body #adv-kpi1, body #adv-kpi2 { gap: 12px !important; margin-bottom: 12px !important; }
+  body #adv-kpi1 .adv-card, body #adv-kpi2 .adv-card, body #debts .adv-card { padding: 14px !important; }
+  /* Aturan lama memaksa semua grid dashboard 1 kolom; KPI dikembalikan ke 2 kolom */
+  body #dashboard #adv-kpi1, body #dashboard #adv-kpi2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  body #adv-kpi1 .adv-card .text-xl, body #adv-kpi2 .adv-card .text-xl { font-size: 17px !important; letter-spacing: -.03em; }
+  body #adv-kpi1 .adv-card .adv-kicker, body #adv-kpi2 .adv-card .adv-kicker { font-size: 12px !important; line-height: 1.25; }
+  body .adv-card .text-xl, body .adv-card .text-2xl { font-size: 20px !important; font-weight: 800 !important; letter-spacing: -.025em; line-height: 1.15; }
+  body #adv-score .text-3xl { font-size: 34px !important; letter-spacing: -.03em; }
+
+  /* ---------- Formulir ---------- */
+  body .tab-content input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]),
+  body .tab-content select,
+  body .tab-content textarea {
+    font-size: 16px !important; min-height: 48px; border-radius: 14px !important;
+    background-color: #f6f8f7 !important; border: 1px solid var(--m-line) !important; color: var(--m-ink);
+    -webkit-appearance: none; appearance: none;
+  }
+  body .tab-content select {
+    padding-right: 34px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2386958e' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important; background-position: right 14px center !important;
+  }
+  body .tab-content input[type=date] { min-height: 48px; }
+  body .tab-content textarea { min-height: 96px; }
+  body .tab-content input:focus, body .tab-content select:focus, body .tab-content textarea:focus {
+    outline: 0 !important; border-color: var(--m-brand) !important; background-color: #fff !important;
+    box-shadow: 0 0 0 4px rgba(11, 122, 85, .16) !important;
+  }
+
+  /* ---------- Tombol ---------- */
+  body .tab-content button { min-height: 44px; border-radius: 14px; font-weight: 600; transition: transform .12s ease, filter .12s ease; }
+  body .tab-content button:active { transform: scale(.975); filter: brightness(.95); }
+  body .tab-content button.bg-emerald-600, body .tab-content button.bg-emerald-700 { background-color: var(--m-brand) !important; box-shadow: 0 2px 8px rgba(11, 122, 85, .28) !important; }
+  body #transaction-form button[type=submit], body #receipt-save-btn { width: 100% !important; min-height: 52px; font-size: 16px; justify-content: center; }
+  body #transaction-form .flex.justify-end, body #transaction-form .text-right { justify-content: stretch; }
+
+  /* ---------- Riwayat ---------- */
+  body #history-mobile-list { gap: 12px; }
+  /* Daftar riwayat: lepas bungkus kartu luar supaya tidak ada kartu di dalam kartu */
+  body #history .bg-white:has(> #history-mobile-list) { background: transparent !important; box-shadow: none !important; border-radius: 0 !important; overflow: visible; }
+  body #history #history-mobile-list { padding: 0 !important; }
+
+  /* Form hutang & piutang: satu kolom, tanggal berdampingan, tombol selebar layar */
+  body #debt-form { align-items: start !important; gap: 12px !important; }
+  body #debt-form > div:nth-child(-n+3), body #debt-form > button[type=submit], body #debt-form > input { grid-column: 1 / -1 !important; }
+  body #debt-form > button[type=submit] { min-height: 52px; font-size: 16px; margin-top: 4px; }
+
+  body #history-mobile-list .history-mobile-card {
+    border: 0 !important; border-radius: 18px !important; padding: 14px 16px !important;
+    box-shadow: 0 1px 2px rgba(16, 32, 24, .05), 0 5px 14px rgba(16, 32, 24, .05) !important;
+  }
+
+  /* ---------- Tab bar bawah ---------- */
+  body .mobile-tab-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0;
+    width: 100%; margin: 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    background: var(--m-glass);
+    -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px);
+    border-top: .5px solid var(--m-line);
+  }
+  body .mobile-tab-nav .tab-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px;
+    min-width: 0; min-height: 52px; padding: 2px 0 0 !important;
+    background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 12px;
+    color: var(--m-mute) !important; font-size: 10.5px; font-weight: 600; letter-spacing: .005em; white-space: nowrap;
+  }
+  body .mobile-tab-nav .tab-btn i {
+    width: 54px; height: 30px; margin: 0 !important; display: flex; align-items: center; justify-content: center;
+    border-radius: 999px; font-size: 19px; transition: background-color .2s ease, color .2s ease;
+  }
+  body .mobile-tab-nav .tab-btn.active-tab { color: var(--m-brand) !important; }
+  body .mobile-tab-nav .tab-btn.active-tab i { background: var(--m-soft); }
+  body .mobile-tab-nav .tab-btn:active i { background: #eef2f0; }
+  body.kb-open .mobile-tab-nav { display: none !important; }
+  body.kb-open { padding-bottom: 16px !important; }
+
+  /* ---------- Toast ---------- */
+  body #toast-container {
+    left: 12px !important; right: 12px !important; top: calc(env(safe-area-inset-top) + 62px) !important;
+    align-items: stretch; pointer-events: none;
+  }
+  body #toast-container > * { border-radius: 16px !important; box-shadow: 0 8px 24px rgba(16, 32, 24, .22) !important; font-size: 14px; }
+
+  /* ---------- Login ---------- */
+  body #login-screen { min-height: 100dvh; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  body #login-screen label { text-transform: none !important; letter-spacing: 0 !important; }
+  body #login-screen h1 { letter-spacing: -.02em; }
+  body #login-form button[type=submit], body #recovery-form button[type=submit] { min-height: 52px; font-size: 16px; border-radius: 14px; }
+
+  /* Hormati preferensi gerak berkurang */
+  @media (prefers-reduced-motion: reduce) { body * { transition: none !important; } }
+}
+
+/* Mode aplikasi (ditambahkan ke Layar Utama): tidak ada bilah Safari, jadi ruang bawah lebih pendek */
+@media (max-width: 767px) and (display-mode: standalone) {
+  body { padding-bottom: calc(66px + env(safe-area-inset-bottom)) !important; }
+}
