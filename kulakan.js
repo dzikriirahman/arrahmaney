@@ -27,7 +27,7 @@ async function load(){
   if(!window.supabaseClient && typeof supabaseClient==='undefined'){ st.error='Koneksi database belum siap.'; return; }
   const [k,s,p]=await Promise.all([
     supabaseClient.from('kulakan').select('*').order('tanggal').order('id'),
-    supabaseClient.from('supplier').select('*').order('nama'),
+    supabaseClient.from('supplier_kulakan').select('*').order('nama'),
     supabaseClient.from('pemasukan').select('*').order('tanggal')]);
   const err=k.error||s.error||p.error;
   if(err){ st.error=/relation|does not exist|schema cache/i.test(err.message)?'Tabel kulakan belum dibuat. Jalankan kulakan-setup.sql di Supabase SQL Editor.':err.message; return; }
@@ -195,7 +195,7 @@ async function importExcel(file){
     if(mkP&&mkK&&mkK!==mkP&&confirm(`Tanggal nota tercatat bulan ${mkK}, sedangkan pemasukan bulan ${mkP}. Samakan tanggal nota ke bulan ${mkP}?`)) kul=kul.map(r=>({...r,tanggal:mkP+r.tanggal.slice(7)}));
     if(!confirm(`Impor ${kul.length} baris kulakan, ${pem.length} hari pemasukan, ${sup.length} supplier?`+(st.kulakan.length?`\n\nTabel kulakan sudah berisi ${st.kulakan.length} baris dan akan DIGANTI.`:''))) return;
     if(st.kulakan.length){const d=await supabaseClient.from('kulakan').delete().gt('id',0);if(d.error)throw d.error}
-    let r1=await supabaseClient.from('supplier').upsert(sup,{onConflict:'nama'});if(r1.error)throw r1.error;
+    let r1=await supabaseClient.from('supplier_kulakan').upsert(sup,{onConflict:'nama'});if(r1.error)throw r1.error;
     r1=await supabaseClient.from('kulakan').insert(kul);if(r1.error)throw r1.error;
     if(pem.length){r1=await supabaseClient.from('pemasukan').upsert(pem,{onConflict:'tanggal'});if(r1.error)throw r1.error}
     toast('Impor selesai');await load();draw();

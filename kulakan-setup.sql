@@ -1,6 +1,7 @@
 -- Tab "Kulakan": tabel supplier, kulakan, pemasukan. Jalankan di Supabase > SQL Editor.
+-- Catatan: tabel bernama "supplier" sudah dipakai sistem gudang di proyek ini, maka tab Kulakan memakai supplier_kulakan.
 -- Sama seperti supabase-setup.sql: hanya pengguna yang sudah login yang boleh membaca/menulis.
-create table if not exists public.supplier(
+create table if not exists public.supplier_kulakan(
   id bigint generated always as identity primary key,
   nama text unique not null, kategori text, kontak text, telp text, lokasi text, pembayaran text);
 create table if not exists public.kulakan(
@@ -13,11 +14,11 @@ create table if not exists public.kulakan(
 create table if not exists public.pemasukan(
   tanggal date primary key, pemasukan numeric not null, keuntungan numeric);
 
-alter table public.supplier enable row level security;
+alter table public.supplier_kulakan enable row level security;
 alter table public.kulakan enable row level security;
 alter table public.pemasukan enable row level security;
-revoke all on public.supplier, public.kulakan, public.pemasukan from anon;
-grant select,insert,update,delete on public.supplier, public.kulakan, public.pemasukan to authenticated;
-drop policy if exists "login_all" on public.supplier; create policy "login_all" on public.supplier for all to authenticated using(true) with check(true);
+revoke all on public.supplier_kulakan, public.kulakan, public.pemasukan from anon;
+grant select,insert,update,delete on public.supplier_kulakan, public.kulakan, public.pemasukan to authenticated;
+drop policy if exists "login_all" on public.supplier_kulakan; create policy "login_all" on public.supplier_kulakan for all to authenticated using(true) with check(true);
 drop policy if exists "login_all" on public.kulakan;  create policy "login_all" on public.kulakan  for all to authenticated using(true) with check(true);
 drop policy if exists "login_all" on public.pemasukan; create policy "login_all" on public.pemasukan for all to authenticated using(true) with check(true);
