@@ -93,6 +93,7 @@
         .adv-table tbody tr:nth-child(odd) { background:#fff; }
         @media(max-width:767px) { #user-email { display:none; } }
     </style>
+    <link rel="stylesheet" href="kulakan.css">
 </head>
 <body class="auth-locked text-slate-800 antialiased min-h-screen md:h-screen flex flex-col md:overflow-hidden">
     <!-- LOGIN: aplikasi baru memuat data setelah pengguna berhasil masuk -->
@@ -166,6 +167,9 @@
                 </button>
                 <button onclick="switchTab('debts')" class="tab-btn px-4 py-2 rounded-lg hover:bg-emerald-800/60 transition-all text-sm font-medium text-emerald-200 flex items-center gap-2" data-target="debts">
                     <i class="fas fa-handshake"></i>Hutang & Piutang
+                </button>
+                <button onclick="switchTab('kulakan')" class="tab-btn px-4 py-2 rounded-lg hover:bg-emerald-800/60 transition-all text-sm font-medium text-emerald-200 flex items-center gap-2" data-target="kulakan">
+                    <i class="fas fa-boxes-stacked"></i>Kulakan
                 </button>
             </nav>
             <div id="user-box" class="flex items-center gap-2 ml-auto md:ml-0">
@@ -355,6 +359,8 @@
         <div id="debts" class="tab-content fade-in hidden max-w-5xl mx-auto">
             <div id="debts-root"></div>
         </div>
+    <!-- KULAKAN TAB (diisi oleh kulakan.js) -->
+        <div id="kulakan" class="tab-content fade-in hidden"><div id="kulakan-root"></div></div>
     </main>
 
     <!-- Script Logika & Multi-Metric Line Chart -->
@@ -1434,10 +1440,12 @@
         <button onclick="switchTab('expenses')" class="tab-btn" data-target="expenses"><i class="fas fa-receipt"></i><span>Struk</span></button>
         <button onclick="switchTab('history')" class="tab-btn" data-target="history"><i class="fas fa-history"></i><span>Riwayat</span></button>
         <button onclick="switchTab('debts')" class="tab-btn" data-target="debts"><i class="fas fa-handshake"></i><span>Hutang</span></button>
+        <button onclick="switchTab('kulakan')" class="tab-btn" data-target="kulakan"><i class="fas fa-boxes-stacked"></i><span>Kulakan</span></button>
     </nav>
 
     <script src="auth.js"></script>
     <script src="advisor.js"></script>
     <script src="mobile.js"></script>
+    <script src="kulakan.js"></script>
 </body>
 </html>

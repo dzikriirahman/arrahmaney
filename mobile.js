@@ -6,7 +6,8 @@
     input: ['Catat transaksi', 'Pemasukan atau pengeluaran harian'],
     expenses: ['Detail struk', 'Foto struk, periksa, lalu simpan'],
     history: ['Riwayat', 'Semua transaksi tersimpan di cloud'],
-    debts: ['Hutang & piutang', 'Pantau uang masuk dan kewajiban']
+    debts: ['Hutang & piutang', 'Pantau uang masuk dan kewajiban'],
+    kulakan: ['Kulakan', 'Belanja barang, supplier, dan margin']
   };
   const $ = id => document.getElementById(id);
   let current = 'dashboard';
