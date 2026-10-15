@@ -1,6 +1,6 @@
-// Tab "Kulakan": dashboard widget, buku kulakan, supplier & pemasukan.
+// Tab "Kulakan": dashboard widget, buku kulakan, supplier.
 // Mandiri: hapus tombol nav 'kulakan', div #kulakan, dan file ini (+ kulakan.css) bila tidak dipakai lagi.
-// Memakai supabaseClient & sesi login dari aplikasi utama. Tabel: supplier, kulakan, pemasukan (lihat kulakan-setup.sql).
+// Memakai supabaseClient & sesi login dari aplikasi utama. Tabel: supplier_kulakan, kulakan (lihat kulakan-setup.sql).
 (function () {
 'use strict';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -17,21 +17,20 @@ const store=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(
 
 
 
-const st={kulakan:[],supplier:[],pemasukan:[],sub:'ringkasan',q:'',kat:'Semua',fk:'Semua',fs:'Semua',panel:false,hidden:store('kx-hidden2'),loaded:false,error:''};
+const st={kulakan:[],supplier:[],sub:'ringkasan',q:'',kat:'Semua',fk:'Semua',fs:'Semua',panel:false,hidden:store('kx-hidden2'),loaded:false,error:''};
 const root=()=>document.getElementById('kulakan-root');
 const $=id=>document.getElementById(id);
 const toast=(m,t)=>{ if(window.showToast) window.showToast(m,t||'success'); else alert(m); };
-const NUM=['qty','harga_beli','biaya_angkut','harga_jual','isi_per_satuan','pemasukan','keuntungan'];
+const NUM=['qty','harga_beli','biaya_angkut','harga_jual','isi_per_satuan'];
 
 async function load(){
   if(!window.supabaseClient && typeof supabaseClient==='undefined'){ st.error='Koneksi database belum siap.'; return; }
-  const [k,s,p]=await Promise.all([
+  const [k,s]=await Promise.all([
     supabaseClient.from('kulakan').select('*').order('tanggal').order('id'),
-    supabaseClient.from('supplier_kulakan').select('*').order('nama'),
-    supabaseClient.from('pemasukan').select('*').order('tanggal')]);
-  const err=k.error||s.error||p.error;
+    supabaseClient.from('supplier_kulakan').select('*').order('nama')]);
+  const err=k.error||s.error;
   if(err){ st.error=/relation|does not exist|schema cache/i.test(err.message)?'Tabel kulakan belum dibuat. Jalankan kulakan-setup.sql di Supabase SQL Editor.':err.message; return; }
-  st.error='';Object.assign(st,{kulakan:k.data,supplier:s.data,pemasukan:p.data,loaded:true});
+  st.error='';Object.assign(st,{kulakan:k.data,supplier:s.data,loaded:true});
 }
 
 /* ---------- chart helpers ---------- */
@@ -58,11 +57,8 @@ function compute(){
   k=k.map(r=>({...r,rev:r.harga_jual*r.qty,laba:r.harga_jual*r.qty-r.total_modal,hpp:r.total_modal/r.qty}));
   const group=(key)=>{const m={};k.forEach(r=>m[r[key]]=(m[r[key]]||0)+Number(r.total_modal));return Object.entries(m).map(([l,v])=>({l,v})).sort((a,b)=>b.v-a.v)};
   const tot=sum(k,r=>r.total_modal),rev=sum(k,r=>r.rev),laba=rev-tot,angkut=sum(k,r=>r.biaya_angkut);
-  const masuk=sum(st.pemasukan,r=>r.pemasukan),hari=st.pemasukan.length;
   const bySup=group('supplier'),byKat=group('kategori');
   const katM=byKat.map(c=>{const rr=k.filter(r=>r.kategori===c.l);const rv=sum(rr,r=>r.rev);return{l:c.l,m:rv?(rv-c.v)/rv:0,v:c.v}}).sort((a,b)=>a.m-b.m);
-  const dates=[...new Set([...k.map(r=>r.tanggal),...st.pemasukan.map(p=>p.tanggal)])].sort();
-  const harian=dates.map(d=>({d,belanja:sum(k.filter(r=>r.tanggal===d),r=>r.total_modal),masuk:sum(st.pemasukan.filter(p=>p.tanggal===d),p=>p.pemasukan)}));
   const bk=[[0,.06,'< 6%','#C2542D'],[.06,.10,'6–10%','#F2B632'],[.10,.15,'10–15%','#2F7F6B'],[.15,.25,'15–25%','#0E2A21'],[.25,9,'> 25%','#4B6A9B']].map(([a,b,l,c])=>({l,c,n:k.filter(r=>r.margin>=a&&r.margin<b).length}));
   const notaM={};k.forEach(r=>{const key=r.supplier+'|'+r.tanggal+'|'+r.no_nota;(notaM[key]=notaM[key]||{sup:r.supplier,tgl:r.tanggal,no:r.no_nota,v:0,n:0});notaM[key].v+=Number(r.total_modal);notaM[key].n++});
   const notas=Object.values(notaM).sort((a,b)=>b.v-a.v);
@@ -75,7 +71,7 @@ function compute(){
   const transport={n:k.filter(r=>Number(r.biaya_angkut)>0).length,v:angkut};
   const allTot=sum(st.kulakan,r=>r.total_modal);
   const modalBeli=sum(k,r=>r.harga_beli);
-  return{k,exSup,transport,allTot,modalBeli,tot,rev,laba,angkut,masuk,hari,bySup,byKat,katM,harian,bk,notas,low,topLaba,topM,barang:sum(k,r=>r.qty*r.harga_beli),mw:rev?laba/rev:0};
+  return{k,exSup,transport,allTot,modalBeli,tot,rev,laba,angkut,bySup,byKat,katM,bk,notas,low,topLaba,topM,barang:sum(k,r=>r.qty*r.harga_beli),mw:rev?laba/rev:0};
 }
 
 /* ---------- widgets ---------- */
@@ -84,11 +80,7 @@ const W=[
  {id:'k_ops',t:'TOTAL BIAYA OPERASIONAL',s:4,r:c=>`<div class="kpi"><small>TOTAL BIAYA OPERASIONAL</small><b style="margin:12px 0 8px">${rp(c.angkut)}</b><span>Jumlah kolom Biaya Angkut/Lain (J)</span></div>`},
  {id:'k_out',t:'TOTAL PENGELUARAN',s:4,r:c=>`<div class="kpi"><small>TOTAL PENGELUARAN</small><b style="margin:12px 0 8px">${rp(c.tot)}</b><span>Jumlah kolom Total Modal (K) = (Jumlah × Harga Beli) + Biaya Angkut</span></div>`},
  {id:'k_laba',t:'POTENSI KEUNTUNGAN',s:4,r:c=>`<div class="kpi"><small>POTENSI KEUNTUNGAN</small><b style="margin:12px 0 8px">${rp(c.laba)}</b><span>Jumlah kolom Potensi Profit Total (R) = (Harga Jual − HPP) × Jumlah</span></div>`},
- {id:'k_masuk',t:'TOTAL PEMASUKAN',s:4,r:c=>`<div class="kpi"><small>TOTAL PEMASUKAN</small><b style="margin:12px 0 8px">${rp(c.masuk)}</b><span>${c.hari} hari tercatat (Excel: Pemasukan C)</span></div>`},
- {id:'k_untung',t:'TOTAL KEUNTUNGAN',s:4,r:c=>`<div class="kpi"><small>TOTAL KEUNTUNGAN</small><b style="margin:12px 0 8px">${rp(c.masuk-c.allTot)}</b><span>Rumus Excel (Pemasukan B2): total pemasukan − total pengeluaran kulakan, semua data</span></div>`},
- {id:'pem',t:'Pemasukan harian',s:6,r:c=>`<h3>Pemasukan harian</h3><div class="sub">Kolom Total Pemasukan (Rp)</div>${vbars(st.pemasukan.map(p=>({l:tgl(p.tanggal),vals:[Number(p.pemasukan)]})),'Grafik pemasukan harian',[{n:'Pemasukan',c:'#0E2A21'}])}`},
  {id:'supx',t:'Ringkasan pembelian per supplier',s:6,r:c=>`<h3>Ringkasan pembelian per supplier</h3><div class="sub">Total Pembelian = Jumlah × Harga Beli (tanpa angkut). Angkut tampil di baris TRANSPORT.</div><div class="sc"><table style="min-width:360px"><thead><tr><th>Supplier / Toko</th><th class="r">Transaksi</th><th class="r">Total Pembelian</th></tr></thead><tbody>${c.exSup.map(e=>`<tr><td>${esc(tc(e.l))}</td><td class="r">${e.n}</td><td class="r">${rp(e.v)}</td></tr>`).join('')}${c.transport.v?`<tr><td>Transport</td><td class="r">${c.transport.n}</td><td class="r">${rp(c.transport.v)}</td></tr>`:''}<tr><td><b>Total</b></td><td class="r"><b>${c.exSup.reduce((a,e)=>a+e.n,0)}</b></td><td class="r"><b>${rp(c.exSup.reduce((a,e)=>a+e.v,0)+c.transport.v)}</b></td></tr></tbody></table></div>`},
- {id:'arus',x:1,t:'Pemasukan vs belanja harian',s:8,r:c=>`<h3>Pemasukan vs belanja harian</h3><div class="sub">Garis dasar: apakah uang masuk menutup kulakan</div>${vbars(c.harian.map(h=>({l:tgl(h.d),vals:[h.masuk,h.belanja]})),'Grafik batang pemasukan dan belanja per hari',[{n:'Pemasukan',c:'#0E2A21'},{n:'Belanja kulakan',c:'#F2B632'}])}`},
  {id:'sup',x:1,t:'Pangsa supplier',s:4,r:c=>`<h3>Pangsa supplier</h3><div class="sub">Siapa yang menerima uang belanja</div>${donut([...c.bySup.slice(0,5).map(x=>({l:tc(x.l),v:x.v})),...(c.bySup.length>5?[{l:'Lainnya',v:sum(c.bySup.slice(5),x=>x.v)}]:[])],'Pangsa belanja per supplier')}`},
  {id:'kat',x:1,t:'Pangsa kategori',s:4,r:c=>`<h3>Belanja per kategori</h3><div class="sub">Sebaran modal di tiap jenis barang</div>${donut(c.byKat.map(x=>({l:x.l,v:x.v})),'Pangsa belanja per kategori')}`},
  {id:'katm',x:1,t:'Margin per kategori',s:4,r:c=>`<h3>Margin per kategori</h3><div class="sub">Tertimbang, dari laba ÷ nilai jual</div>${c.katM.map(x=>hrow(x.l,`<b class="pill ${mcls(x.m)}">${pct(x.m)}</b>`,Math.min(1,x.m/.25))).join('')}`},
@@ -103,7 +95,6 @@ const W=[
    if(t1&&c.tot&&t1.v/c.tot>.4)a.push(`${tc(t1.l)} memegang ${pct(t1.v/c.tot,0)} belanja. Minta tempo bayar atau bandingkan harga dengan satu pemasok pembanding.`);
    if(c.low.length)a.push(`${c.low.length} barang bermargin di bawah 6% (${c.low.slice(0,3).map(r=>tc(r.barang)).join(', ')}). Menaikkan ke margin 10% menambah laba ${rp(sum(c.low,r=>r.gain))} bila terjual habis.`);
    const kr=c.katM[0];if(kr)a.push(`Kategori ${kr.l} bermargin paling tipis (${pct(kr.m)}). Pantau harga beli tiap kulakan.`);
-   if(c.masuk&&c.tot/c.masuk>.9)a.push(`Belanja setara ${pct(c.tot/c.masuk,0)} pemasukan. Pastikan stok lama terjual sebelum kulakan berikutnya.`);
    if(c.angkut&&c.tot&&c.angkut/c.tot>.002)a.push(`Biaya angkut ${rp(c.angkut)} (${pct(c.angkut/c.tot,2)} dari modal). Gabungkan pengiriman bila bisa.`);
    return `<div class="eyebrow" style="color:var(--gold)">Catatan pengelola</div><h3 style="font-size:24px">Yang layak dibenahi</h3><ul class="adv" style="color:#DCE8E0">${a.map(x=>`<li>${x}</li>`).join('')||'<li>Belum ada temuan.</li>'}</ul>`}},
  {id:'data',t:'Kualitas data',s:4,r:c=>{const all=st.kulakan,nm=new Set(st.supplier.map(s=>s.nama));
@@ -111,7 +102,7 @@ const W=[
     [all.filter(r=>!r.no_nota||r.no_nota==='-').length,'baris tanpa nomor nota'],
     [[...new Set(all.map(r=>r.supplier))].filter(n=>!nm.has(n)).length,'supplier belum ada di Master Supplier'],
     [st.supplier.filter(s=>!s.telp).length,'supplier tanpa nomor telepon'],
-    [st.pemasukan.length?0:1,'belum ada data pemasukan']];
+    ];
    return `<h3>Kualitas data</h3><div class="sub">Pemeriksaan kelengkapan isi, bukan rumus</div>${items.map(([n,t])=>`<div class="chk"><em class="${n?'y':'g'}">${n?n:'✓'}</em><span>${t}</span></div>`).join('')}`}}
 ];
 
@@ -151,15 +142,11 @@ function vBuku(){
   </tbody></table></div><div style="padding:16px;font-size:13px;color:var(--mut)">${rows.length} baris. Baris TOTAL mengikuti baris TOTAL di Excel (Jumlah, Harga Beli/Unit, Biaya Angkut, Total Modal, Potensi Profit).</div></div>`;
 }
 function vSupplier(){
-  return `<header><div class="eyebrow">Supplier & Pemasukan</div><h1>Pemasok dan uang masuk</h1></header>
-  <section class="wg">${st.supplier.map(s=>{const t=st.kulakan.filter(r=>r.supplier===s.nama);return `<div class="w s4"><h3>${esc(tc(s.nama))}</h3><div class="sub">${esc(tc(s.kategori))}</div><p style="line-height:1.6;margin:0">${esc(tc(s.lokasi))||'Alamat belum diisi'}<br>${esc(s.telp)||'Nomor belum diisi'}</p><div><span class="pill ${s.pembayaran==='CASH'?'g':s.pembayaran?'y':'n'}">${esc(s.pembayaran)||'Syarat bayar belum diisi'}</span></div><div style="margin-top:auto;border-top:1px solid var(--bg);padding-top:12px;font-size:13px;display:flex;justify-content:space-between"><span>${t.length} barang</span><b>${rp(sum(t,r=>Number(r.qty)*Number(r.harga_beli)))}</b></div></div>`}).join('')}</section>
-  <div class="w"><h3>Pemasukan harian</h3>
-   <form id="kx-fp"><label>Tanggal<input type="date" name="tanggal" required></label><label>Pemasukan<input name="pemasukan" type="number" required></label><button class="btn">Catat</button></form>
-   <div class="sc"><table><thead><tr><th>Tanggal</th><th class="r">Pemasukan</th></tr></thead><tbody>${st.pemasukan.map(p=>`<tr><td>${tgl(p.tanggal)}</td><td class="r"><b>${rp(p.pemasukan)}</b></td></tr>`).join('')}<tr><td><b>Total pemasukan</b></td><td class="r"><b>${rp(sum(st.pemasukan,p=>p.pemasukan))}</b></td></tr></tbody></table></div><p style="font-size:13px;color:var(--mut);margin:0">Total keuntungan (rumus Excel) = total pemasukan − total pengeluaran kulakan = <b>${rp(sum(st.pemasukan,p=>p.pemasukan)-sum(st.kulakan,r=>r.total_modal))}</b></p></div>`;
+  return `<header><div class="eyebrow">Supplier</div><h1>Pemasok</h1></header>
+  <section class="wg">${st.supplier.map(s=>{const t=st.kulakan.filter(r=>r.supplier===s.nama);return `<div class="w s4"><h3>${esc(tc(s.nama))}</h3><div class="sub">${esc(tc(s.kategori))}</div><p style="line-height:1.6;margin:0">${esc(tc(s.lokasi))||'Alamat belum diisi'}<br>${esc(s.telp)||'Nomor belum diisi'}</p><div><span class="pill ${s.pembayaran==='CASH'?'g':s.pembayaran?'y':'n'}">${esc(s.pembayaran)||'Syarat bayar belum diisi'}</span></div><div style="margin-top:auto;border-top:1px solid var(--bg);padding-top:12px;font-size:13px;display:flex;justify-content:space-between"><span>${t.length} barang</span><b>${rp(sum(t,r=>Number(r.qty)*Number(r.harga_beli)))}</b></div></div>`}).join('')}</section>`;
 }
 
-
-const SUBS=[['ringkasan','Ringkasan'],['buku','Buku Kulakan'],['supplier','Supplier & Pemasukan']];
+const SUBS=[['ringkasan','Ringkasan'],['buku','Buku Kulakan'],['supplier','Supplier']];
 function draw(){
   const r=root(); if(!r) return;
   const head=`<div class="kx-sub">${SUBS.map(([k,l])=>`<button data-sub="${k}" class="${k===st.sub?'on':''}">${l}</button>`).join('')}<span style="flex:1"></span><label class="ghost kx-imp">Impor Excel<input id="kx-file" type="file" accept=".xlsx,.xls" hidden></label></div>`;
@@ -173,7 +160,6 @@ function draw(){
   $('kx-file').onchange=e=>importExcel(e.target.files[0]);
   if($('kx-q')){ $('kx-q').oninput=e=>{st.q=e.target.value;const p=e.target.selectionStart;draw();const n=$('kx-q');n.focus();n.setSelectionRange(p,p)}; $('kx-kat').onchange=e=>{st.kat=e.target.value;draw()}; }
   if($('kx-f')) $('kx-f').onsubmit=e=>save(e,'kulakan');
-  if($('kx-fp')) $('kx-fp').onsubmit=e=>save(e,'pemasukan');
   if($('kx-fk')){ $('kx-fk').onchange=e=>{st.fk=e.target.value;draw()}; $('kx-fs').onchange=e=>{st.fs=e.target.value;draw()};
     $('kx-tp').onclick=()=>{st.panel=!st.panel;draw()};
     $('kx-panel').onchange=e=>{const id=e.target.dataset.w;st.hidden=e.target.checked?st.hidden.filter(x=>x!==id):[...st.hidden,id];store('kx-hidden2',st.hidden);draw()}; }
@@ -183,7 +169,7 @@ async function save(e,table){
   const o=Object.fromEntries(new FormData(e.target));
   for(const k in o){ if(o[k]==='') o[k]=null; else if(NUM.includes(k)) o[k]=Number(o[k]); }
   if(o.supplier) o.supplier=o.supplier.trim().toUpperCase();
-  const {error}=table==='pemasukan'?await supabaseClient.from(table).upsert(o):await supabaseClient.from(table).insert(o);
+  const {error}=await supabaseClient.from(table).insert(o);
   if(error){toast(error.message,'error');return}
   toast('Tersimpan');await load();draw();
 }
@@ -197,20 +183,18 @@ async function importExcel(file){
   try{
     const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
     let kul=sheetRows(wb,'Detail Kulakan').filter(r=>typeof r[0]==='number'&&typeof r[1]==='number'&&r[5]).map(r=>({tanggal:ymd(r[1]),no_nota:String(r[2]??'-'),kategori:r[3],supplier:ALIAS[String(r[4]).trim().toUpperCase()]||String(r[4]).trim().toUpperCase(),barang:r[5],qty:r[6],satuan:r[7],harga_beli:r[8],biaya_angkut:r[9]||0,harga_jual:r[12],isi_per_satuan:r[13]}));
-    const pem=sheetRows(wb,'Pemasukan').filter(r=>typeof r[0]==='number'&&typeof r[2]==='number').map(r=>({tanggal:ymd(r[0]),pemasukan:r[2],keuntungan:null}));
     const sup=sheetRows(wb,'Master Supplier').filter(r=>typeof r[1]==='number'&&r[2]).map(r=>({nama:String(r[2]).trim().toUpperCase(),kategori:r[3],kontak:r[4],telp:r[5]?String(r[5]):null,lokasi:r[6],pembayaran:r[7]}));
     if(!kul.length) return toast('Sheet "Detail Kulakan" tidak berisi data.','error');
     // supplier yang belum ada di master ikut dibuat
     const have=new Set(sup.map(s=>s.nama));
     [...new Set(kul.map(r=>r.supplier))].filter(n=>!have.has(n)).forEach(n=>sup.push({nama:n,kategori:[...new Set(kul.filter(r=>r.supplier===n).map(r=>r.kategori))].join(', ').toUpperCase(),kontak:null,telp:null,lokasi:null,pembayaran:null}));
-    // bulan nota tidak sama dengan bulan pemasukan -> tawarkan koreksi
-    const mk=a=>a.map(r=>r.tanggal).sort().pop()?.slice(0,7), mkK=mk(kul), mkP=mk(pem);
-    if(mkP&&mkK&&mkK!==mkP&&confirm(`Tanggal nota tercatat bulan ${mkK}, sedangkan pemasukan bulan ${mkP}. Samakan tanggal nota ke bulan ${mkP}?`)) kul=kul.map(r=>({...r,tanggal:mkP+r.tanggal.slice(7)}));
-    if(!confirm(`Impor ${kul.length} baris kulakan, ${pem.length} hari pemasukan, ${sup.length} supplier?`+(st.kulakan.length?`\n\nTabel kulakan sudah berisi ${st.kulakan.length} baris dan akan DIGANTI.`:''))) return;
+    // Tanggal nota di Excel lebih maju dari bulan ini (typo)? tawarkan koreksi, boleh ditolak
+    const mkK=kul.map(r=>r.tanggal).sort().pop()?.slice(0,7), now=new Date().toISOString().slice(0,7);
+    if(mkK&&mkK>now&&confirm(`Tanggal nota di Excel tertulis bulan ${mkK}, lebih maju dari bulan ini (${now}). Ubah ke bulan ${now}? Pilih Batal untuk memakai tanggal persis seperti di Excel.`)) kul=kul.map(r=>({...r,tanggal:now+r.tanggal.slice(7)}));
+    if(!confirm(`Impor ${kul.length} baris kulakan dan ${sup.length} supplier?`+(st.kulakan.length?`\n\nTabel kulakan sudah berisi ${st.kulakan.length} baris dan akan DIGANTI.`:''))) return;
     if(st.kulakan.length){const d=await supabaseClient.from('kulakan').delete().gt('id',0);if(d.error)throw d.error}
     let r1=await supabaseClient.from('supplier_kulakan').upsert(sup,{onConflict:'nama'});if(r1.error)throw r1.error;
     r1=await supabaseClient.from('kulakan').insert(kul);if(r1.error)throw r1.error;
-    if(pem.length){r1=await supabaseClient.from('pemasukan').upsert(pem,{onConflict:'tanggal'});if(r1.error)throw r1.error}
     toast('Impor selesai');await load();draw();
   }catch(err){toast('Impor gagal: '+(err.message||err),'error')}
 }
