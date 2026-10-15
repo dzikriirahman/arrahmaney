@@ -17,7 +17,7 @@ const store=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(
 
 
 
-const st={kulakan:[],supplier:[],pemasukan:[],sub:'ringkasan',q:'',kat:'Semua',fk:'Semua',fs:'Semua',panel:false,hidden:store('kx-hidden')||[],loaded:false,error:''};
+const st={kulakan:[],supplier:[],pemasukan:[],sub:'ringkasan',q:'',kat:'Semua',fk:'Semua',fs:'Semua',panel:false,hidden:store('kx-hidden2'),loaded:false,error:''};
 const root=()=>document.getElementById('kulakan-root');
 const $=id=>document.getElementById(id);
 const toast=(m,t)=>{ if(window.showToast) window.showToast(m,t||'success'); else alert(m); };
@@ -69,26 +69,37 @@ function compute(){
   const low=k.filter(r=>r.margin<.06).sort((a,b)=>a.margin-b.margin).map(r=>{const target=Math.ceil(r.hpp/.9/500)*500;return{...r,target,gain:(target-r.harga_jual)*r.qty}});
   const topLaba=[...k].sort((a,b)=>b.laba-a.laba).slice(0,8);
   const topM=[...k].filter(r=>r.laba>0).sort((a,b)=>b.margin-a.margin).slice(0,6);
-  return{k,tot,rev,laba,angkut,masuk,hari,bySup,byKat,katM,harian,bk,notas,low,topLaba,topM,barang:sum(k,r=>r.qty*r.harga_beli),mw:rev?laba/rev:0};
+  // Ringkasan supplier mengikuti Excel: Total Pembelian = jumlah x harga beli (TANPA biaya angkut); angkut ditampilkan sebagai baris TRANSPORT.
+  const exM={};k.forEach(r=>{const e=exM[r.supplier]=exM[r.supplier]||{l:r.supplier,n:0,v:0};e.n++;e.v+=Number(r.qty)*Number(r.harga_beli)});
+  const exSup=Object.values(exM).sort((a,b)=>b.v-a.v);
+  const transport={n:k.filter(r=>Number(r.biaya_angkut)>0).length,v:angkut};
+  const allTot=sum(st.kulakan,r=>r.total_modal);
+  const modalBeli=sum(k,r=>r.harga_beli);
+  return{k,exSup,transport,allTot,modalBeli,tot,rev,laba,angkut,masuk,hari,bySup,byKat,katM,harian,bk,notas,low,topLaba,topM,barang:sum(k,r=>r.qty*r.harga_beli),mw:rev?laba/rev:0};
 }
 
 /* ---------- widgets ---------- */
 const W=[
- {id:'k1',t:'Total belanja kulakan',s:3,r:c=>`<div class="kpi"><small>Total belanja kulakan</small><b style="margin:12px 0 8px">${rpS(c.tot)}</b><span>${c.k.length} barang · ${c.bySup.length} pemasok</span></div>`},
- {id:'k2',t:'Pemasukan tercatat',s:3,r:c=>`<div class="kpi"><small>Pemasukan tercatat</small><b style="margin:12px 0 8px">${rpS(c.masuk)}</b><span>${c.hari} hari · rata-rata ${rpS(c.hari?c.masuk/c.hari:0)}/hari</span></div>`},
- {id:'k3',t:'Potensi laba kotor',s:3,r:c=>`<div class="kpi"><small>Potensi laba kotor</small><b style="margin:12px 0 8px">${rpS(c.laba)}</b><span>Margin rata-rata tertimbang ${pct(c.mw)}</span></div>`},
- {id:'k4',t:'Belanja vs pemasukan',s:3,r:c=>{const x=c.masuk?c.tot/c.masuk:0;return `<div class="kpi"><small>Belanja ÷ pemasukan</small><b style="margin:12px 0 8px">${pct(x,0)}</b><span>${x>.9?'Hampir seluruh uang masuk tertanam di stok':'Arus kas masih longgar'}</span></div>`}},
- {id:'arus',t:'Pemasukan vs belanja harian',s:8,r:c=>`<h3>Pemasukan vs belanja harian</h3><div class="sub">Garis dasar: apakah uang masuk menutup kulakan</div>${vbars(c.harian.map(h=>({l:tgl(h.d),vals:[h.masuk,h.belanja]})),'Grafik batang pemasukan dan belanja per hari',[{n:'Pemasukan',c:'#0E2A21'},{n:'Belanja kulakan',c:'#F2B632'}])}`},
- {id:'sup',t:'Pangsa supplier',s:4,r:c=>`<h3>Pangsa supplier</h3><div class="sub">Siapa yang menerima uang belanja</div>${donut([...c.bySup.slice(0,5).map(x=>({l:tc(x.l),v:x.v})),...(c.bySup.length>5?[{l:'Lainnya',v:sum(c.bySup.slice(5),x=>x.v)}]:[])],'Pangsa belanja per supplier')}`},
- {id:'kat',t:'Pangsa kategori',s:4,r:c=>`<h3>Belanja per kategori</h3><div class="sub">Sebaran modal di tiap jenis barang</div>${donut(c.byKat.map(x=>({l:x.l,v:x.v})),'Pangsa belanja per kategori')}`},
- {id:'katm',t:'Margin per kategori',s:4,r:c=>`<h3>Margin per kategori</h3><div class="sub">Tertimbang, dari laba ÷ nilai jual</div>${c.katM.map(x=>hrow(x.l,`<b class="pill ${mcls(x.m)}">${pct(x.m)}</b>`,Math.min(1,x.m/.25))).join('')}`},
- {id:'hist',t:'Sebaran margin',s:4,r:c=>`<h3>Sebaran margin barang</h3><div class="sub">Jumlah barang tiap rentang</div>${vbars(c.bk.map(b=>({l:b.l,vals:[b.n],fmt:v=>v})),'Histogram jumlah barang menurut margin',[{n:'Barang',c:'#2F7F6B'}],300)}`},
+ {id:'k_modal',t:'TOTAL MODAL KULAKAN',s:4,r:c=>`<div class="kpi"><small>TOTAL MODAL KULAKAN</small><b style="margin:12px 0 8px">${rp(c.modalBeli)}</b><span>Jumlah kolom Harga Beli / Unit (Excel: Detail Kulakan I)</span></div>`},
+ {id:'k_ops',t:'TOTAL BIAYA OPERASIONAL',s:4,r:c=>`<div class="kpi"><small>TOTAL BIAYA OPERASIONAL</small><b style="margin:12px 0 8px">${rp(c.angkut)}</b><span>Jumlah kolom Biaya Angkut/Lain (J)</span></div>`},
+ {id:'k_out',t:'TOTAL PENGELUARAN',s:4,r:c=>`<div class="kpi"><small>TOTAL PENGELUARAN</small><b style="margin:12px 0 8px">${rp(c.tot)}</b><span>Jumlah kolom Total Modal (K) = (Jumlah × Harga Beli) + Biaya Angkut</span></div>`},
+ {id:'k_laba',t:'POTENSI KEUNTUNGAN',s:4,r:c=>`<div class="kpi"><small>POTENSI KEUNTUNGAN</small><b style="margin:12px 0 8px">${rp(c.laba)}</b><span>Jumlah kolom Potensi Profit Total (R) = (Harga Jual − HPP) × Jumlah</span></div>`},
+ {id:'k_masuk',t:'TOTAL PEMASUKAN',s:4,r:c=>`<div class="kpi"><small>TOTAL PEMASUKAN</small><b style="margin:12px 0 8px">${rp(c.masuk)}</b><span>${c.hari} hari tercatat (Excel: Pemasukan C)</span></div>`},
+ {id:'k_untung',t:'TOTAL KEUNTUNGAN',s:4,r:c=>`<div class="kpi"><small>TOTAL KEUNTUNGAN</small><b style="margin:12px 0 8px">${rp(c.masuk-c.allTot)}</b><span>Rumus Excel (Pemasukan B2): total pemasukan − total pengeluaran kulakan, semua data</span></div>`},
+ {id:'pem',t:'Pemasukan harian',s:6,r:c=>`<h3>Pemasukan harian</h3><div class="sub">Kolom Total Pemasukan (Rp)</div>${vbars(st.pemasukan.map(p=>({l:tgl(p.tanggal),vals:[Number(p.pemasukan)]})),'Grafik pemasukan harian',[{n:'Pemasukan',c:'#0E2A21'}])}`},
+ {id:'supx',t:'Ringkasan pembelian per supplier',s:6,r:c=>`<h3>Ringkasan pembelian per supplier</h3><div class="sub">Total Pembelian = Jumlah × Harga Beli (tanpa angkut). Angkut tampil di baris TRANSPORT.</div><div class="sc"><table style="min-width:360px"><thead><tr><th>Supplier / Toko</th><th class="r">Transaksi</th><th class="r">Total Pembelian</th></tr></thead><tbody>${c.exSup.map(e=>`<tr><td>${esc(tc(e.l))}</td><td class="r">${e.n}</td><td class="r">${rp(e.v)}</td></tr>`).join('')}${c.transport.v?`<tr><td>Transport</td><td class="r">${c.transport.n}</td><td class="r">${rp(c.transport.v)}</td></tr>`:''}<tr><td><b>Total</b></td><td class="r"><b>${c.exSup.reduce((a,e)=>a+e.n,0)}</b></td><td class="r"><b>${rp(c.exSup.reduce((a,e)=>a+e.v,0)+c.transport.v)}</b></td></tr></tbody></table></div>`},
+ {id:'arus',x:1,t:'Pemasukan vs belanja harian',s:8,r:c=>`<h3>Pemasukan vs belanja harian</h3><div class="sub">Garis dasar: apakah uang masuk menutup kulakan</div>${vbars(c.harian.map(h=>({l:tgl(h.d),vals:[h.masuk,h.belanja]})),'Grafik batang pemasukan dan belanja per hari',[{n:'Pemasukan',c:'#0E2A21'},{n:'Belanja kulakan',c:'#F2B632'}])}`},
+ {id:'sup',x:1,t:'Pangsa supplier',s:4,r:c=>`<h3>Pangsa supplier</h3><div class="sub">Siapa yang menerima uang belanja</div>${donut([...c.bySup.slice(0,5).map(x=>({l:tc(x.l),v:x.v})),...(c.bySup.length>5?[{l:'Lainnya',v:sum(c.bySup.slice(5),x=>x.v)}]:[])],'Pangsa belanja per supplier')}`},
+ {id:'kat',x:1,t:'Pangsa kategori',s:4,r:c=>`<h3>Belanja per kategori</h3><div class="sub">Sebaran modal di tiap jenis barang</div>${donut(c.byKat.map(x=>({l:x.l,v:x.v})),'Pangsa belanja per kategori')}`},
+ {id:'katm',x:1,t:'Margin per kategori',s:4,r:c=>`<h3>Margin per kategori</h3><div class="sub">Tertimbang, dari laba ÷ nilai jual</div>${c.katM.map(x=>hrow(x.l,`<b class="pill ${mcls(x.m)}">${pct(x.m)}</b>`,Math.min(1,x.m/.25))).join('')}`},
+ {id:'hist',x:1,t:'Sebaran margin',s:4,r:c=>`<h3>Sebaran margin barang</h3><div class="sub">Jumlah barang tiap rentang</div>${vbars(c.bk.map(b=>({l:b.l,vals:[b.n],fmt:v=>v})),'Histogram jumlah barang menurut margin',[{n:'Barang',c:'#2F7F6B'}],300)}`},
  {id:'laba',t:'Penyumbang laba terbesar',s:6,r:c=>{const m=c.topLaba[0]?.laba||1;return `<h3>Penyumbang laba terbesar</h3><div class="sub">Potensi laba kotor per barang</div>${c.topLaba.map(r=>hrow(tc(r.barang),rp(r.laba),r.laba/m,'background:#2F7F6B')).join('')}`}},
- {id:'low',t:'Margin tipis',s:6,r:c=>`<h3>Margin di bawah 6%</h3><div class="sub">Saran harga agar margin 10%${c.low.length?` · tambahan laba ${rp(sum(c.low,r=>r.gain))}`:''}</div>${c.low.length?`<div class="sc"><table style="min-width:420px"><tbody>${c.low.slice(0,6).map(r=>`<tr><td><b>${esc(tc(r.barang))}</b><div style="font-size:12px;color:#4D6B5D">${esc(tc(r.supplier))}</div></td><td class="r"><span class="pill rd">${pct(r.margin)}</span></td><td class="r" style="font-size:13px">${rp(r.harga_jual)} → <b>${rp(r.target)}</b></td></tr>`).join('')}</tbody></table></div>`:'<span class="pill g">Tidak ada</span>'}`},
- {id:'top',t:'Margin tertinggi',s:4,r:c=>`<h3>Margin tertinggi</h3><div class="sub">Barang paling menguntungkan per rupiah</div>${c.topM.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--bg)"><div><b>${esc(tc(r.barang))}</b><div style="font-size:12px;color:#4D6B5D">${esc(tc(r.supplier))}</div></div><span class="pill g">${pct(r.margin)}</span></div>`).join('')}`},
- {id:'nota',t:'Nota terbesar',s:4,r:c=>{const m=c.notas[0]?.v||1;return `<h3>Nota terbesar</h3><div class="sub">${c.notas.length} nota/pengiriman tercatat</div>${c.notas.slice(0,6).map(n=>hrow(`${tc(n.sup)} · ${tgl(n.tgl)}`,rp(n.v),n.v/m,'background:#4B6A9B')).join('')}`}},
- {id:'konsen',t:'Ketergantungan supplier',s:4,r:c=>{const t1=c.bySup[0],t3=sum(c.bySup.slice(0,3),x=>x.v);const a=c.tot?t1?.v/c.tot:0;return `<h3>Ketergantungan supplier</h3><div class="sub">Makin tinggi, makin rapuh bila pemasok bermasalah</div><div class="kpi"><b>${pct(a,0)}</b><span>${t1?esc(tc(t1.l)):'-'} · 3 terbesar ${pct(c.tot?t3/c.tot:0,0)}</span></div><span class="pill ${a>.5?'rd':a>.35?'y':'g'}" style="align-self:flex-start">${a>.5?'Tinggi':a>.35?'Sedang':'Sehat'}</span>`}},
- {id:'saran',t:'Catatan pengelola',s:8,dark:1,r:c=>{const a=[];const t1=c.bySup[0];
+ {id:'low',x:1,t:'Margin tipis',s:6,r:c=>`<h3>Margin di bawah 6%</h3><div class="sub">Saran harga agar margin 10%${c.low.length?` · tambahan laba ${rp(sum(c.low,r=>r.gain))}`:''}</div>${c.low.length?`<div class="sc"><table style="min-width:420px"><tbody>${c.low.slice(0,6).map(r=>`<tr><td><b>${esc(tc(r.barang))}</b><div style="font-size:12px;color:#4D6B5D">${esc(tc(r.supplier))}</div></td><td class="r"><span class="pill rd">${pct(r.margin)}</span></td><td class="r" style="font-size:13px">${rp(r.harga_jual)} → <b>${rp(r.target)}</b></td></tr>`).join('')}</tbody></table></div>`:'<span class="pill g">Tidak ada</span>'}`},
+ {id:'top',t:'Margin tertinggi',s:4,r:c=>`<h3>Margin tertinggi</h3><div class="sub">Barang paling menguntungkan per rupiah</div>${c.topM.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--bg)"><div><b>${esc(tc(r.barang))}</b><div style="font-size:12px;color:#4D6B5D">${esc(tc(r.supplier))}</div></div><span class="pill n">${pct(r.margin)}</span></div>`).join('')}`},
+ {id:'rendah',t:'Margin terendah',s:4,r:c=>`<h3>Margin terendah</h3><div class="sub">Kolom Margin (%) diurutkan naik</div>${[...c.k].filter(r=>r.margin!=null).sort((a,b)=>a.margin-b.margin).slice(0,6).map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--bg)"><div><b>${esc(tc(r.barang))}</b><div style="font-size:12px;color:#4D6B5D">${esc(tc(r.supplier))}</div></div><span class="pill n">${pct(r.margin)}</span></div>`).join('')}`},
+ {id:'nota',x:1,t:'Nota terbesar',s:4,r:c=>{const m=c.notas[0]?.v||1;return `<h3>Nota terbesar</h3><div class="sub">${c.notas.length} nota/pengiriman tercatat</div>${c.notas.slice(0,6).map(n=>hrow(`${tc(n.sup)} · ${tgl(n.tgl)}`,rp(n.v),n.v/m,'background:#4B6A9B')).join('')}`}},
+ {id:'konsen',x:1,t:'Ketergantungan supplier',s:4,r:c=>{const t1=c.bySup[0],t3=sum(c.bySup.slice(0,3),x=>x.v);const a=c.tot?t1?.v/c.tot:0;return `<h3>Ketergantungan supplier</h3><div class="sub">Makin tinggi, makin rapuh bila pemasok bermasalah</div><div class="kpi"><b>${pct(a,0)}</b><span>${t1?esc(tc(t1.l)):'-'} · 3 terbesar ${pct(c.tot?t3/c.tot:0,0)}</span></div><span class="pill ${a>.5?'rd':a>.35?'y':'g'}" style="align-self:flex-start">${a>.5?'Tinggi':a>.35?'Sedang':'Sehat'}</span>`}},
+ {id:'saran',x:1,t:'Catatan pengelola',s:8,dark:1,r:c=>{const a=[];const t1=c.bySup[0];
    if(t1&&c.tot&&t1.v/c.tot>.4)a.push(`${tc(t1.l)} memegang ${pct(t1.v/c.tot,0)} belanja. Minta tempo bayar atau bandingkan harga dengan satu pemasok pembanding.`);
    if(c.low.length)a.push(`${c.low.length} barang bermargin di bawah 6% (${c.low.slice(0,3).map(r=>tc(r.barang)).join(', ')}). Menaikkan ke margin 10% menambah laba ${rp(sum(c.low,r=>r.gain))} bila terjual habis.`);
    const kr=c.katM[0];if(kr)a.push(`Kategori ${kr.l} bermargin paling tipis (${pct(kr.m)}). Pantau harga beli tiap kulakan.`);
@@ -100,11 +111,12 @@ const W=[
     [all.filter(r=>!r.no_nota||r.no_nota==='-').length,'baris tanpa nomor nota'],
     [[...new Set(all.map(r=>r.supplier))].filter(n=>!nm.has(n)).length,'supplier belum ada di Master Supplier'],
     [st.supplier.filter(s=>!s.telp).length,'supplier tanpa nomor telepon'],
-    [st.pemasukan.filter(p=>!p.keuntungan).length,'hari pemasukan tanpa angka keuntungan']];
-   return `<h3>Kualitas data</h3><div class="sub">Lengkapi agar laporan akurat</div>${items.map(([n,t])=>`<div class="chk"><em class="${n?'y':'g'}">${n?n:'✓'}</em><span>${t}</span></div>`).join('')}`}}
+    [st.pemasukan.length?0:1,'belum ada data pemasukan']];
+   return `<h3>Kualitas data</h3><div class="sub">Pemeriksaan kelengkapan isi, bukan rumus</div>${items.map(([n,t])=>`<div class="chk"><em class="${n?'y':'g'}">${n?n:'✓'}</em><span>${t}</span></div>`).join('')}`}}
 ];
 
 
+if(!st.hidden) st.hidden=W.filter(w=>w.x).map(w=>w.id);
 function vRingkasan(){
   const c=compute(),kats=['Semua',...new Set(st.kulakan.map(r=>r.kategori))],sups=['Semua',...new Set(st.kulakan.map(r=>r.supplier))];
   const vis=W.filter(w=>!st.hidden.includes(w.id));
@@ -112,9 +124,9 @@ function vRingkasan(){
    <div class="tools"><label style="position:absolute;left:-9999px" for="kx-fk">Kategori</label><select id="kx-fk">${kats.map(x=>`<option ${x===st.fk?'selected':''}>${esc(x)}</option>`).join('')}</select>
    <label style="position:absolute;left:-9999px" for="kx-fs">Supplier</label><select id="kx-fs">${sups.map(x=>`<option ${x===st.fs?'selected':''} value="${esc(x)}">${esc(x==='Semua'?x:tc(x))}</option>`).join('')}</select>
    <button class="ghost" id="kx-tp" aria-expanded="${st.panel}">Atur widget</button></div></div>
-   <div id="kx-panel" class="${st.panel?'open':''}">${W.map(w=>`<label><input type="checkbox" data-w="${w.id}" ${st.hidden.includes(w.id)?'':'checked'} style="min-height:auto"> ${w.t}</label>`).join('')}</div>
-   <div class="wg">${vis.map(w=>`<section class="w s${w.s}${w.dark?' dark':''}">${w.r(c)}</section>`).join('')}</div>
-   <div style="font-size:12px;color:#4D6B5D">Total modal = jumlah × harga beli + biaya angkut. Margin = (harga jual − modal per unit) ÷ harga jual. Filter kategori/supplier berlaku untuk widget kulakan.</div>`;
+   <div id="kx-panel" class="${st.panel?'open':''}">${W.map(w=>`<label><input type="checkbox" data-w="${w.id}" ${st.hidden.includes(w.id)?'':'checked'} style="min-height:auto"> ${w.t}${w.x?' <span class="pill n" style="font-size:11px">Tambahan</span>':''}</label>`).join('')}</div>
+   <div class="wg">${vis.map(w=>`<section class="w s${w.s}${w.dark?' dark':''}">${w.x?'<span class="pill n" style="align-self:flex-start;font-size:11px">Tambahan · bukan rumus Excel</span>':''}${w.r(c)}</section>`).join('')}</div>
+   <div style="font-size:12px;color:#4D6B5D">Rumus Excel: Total Modal = (Jumlah × Harga Beli) + Biaya Angkut; HPP = Total Modal ÷ Jumlah; Margin = (Harga Jual − HPP) ÷ Harga Jual; Potensi Profit = (Harga Jual − HPP) × Jumlah. Widget bertanda &quot;Tambahan&quot; bukan dari Excel dan disembunyikan secara bawaan (Atur widget). Filter kategori/supplier mengubah angka widget; total keuntungan selalu memakai semua data.</div>`;
 }
 function vBuku(){
   const kats=['Semua',...new Set(st.kulakan.map(r=>r.kategori))];
@@ -133,16 +145,17 @@ function vBuku(){
    <button class="btn">Simpan</button></form></div>
   <div style="display:flex;flex-wrap:wrap;gap:12px"><input id="kx-q" placeholder="Cari barang atau nota" value="${esc(st.q)}" style="flex:1 1 260px" aria-label="Cari">
    <select id="kx-kat" aria-label="Kategori">${kats.map(c=>`<option ${c===st.kat?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
-  <div class="w" style="padding:0;overflow:hidden"><div class="sc"><table style="min-width:900px"><thead><tr><th>Tanggal</th><th>Barang</th><th>Supplier</th><th class="r">Jumlah</th><th class="r">Total modal</th><th class="r">Harga jual</th><th class="r">Margin</th></tr></thead><tbody>
-   ${rows.map(r=>`<tr><td>${tgl(r.tanggal)}</td><td><b>${esc(r.barang)}</b><div style="font-size:12px;color:#4D6B5D">${esc(r.kategori)}</div></td><td>${esc(tc(r.supplier))}</td><td class="r">${r.qty} ${esc((r.satuan||'').toLowerCase())}</td><td class="r"><b>${rp(r.total_modal)}</b></td><td class="r">${rp(r.harga_jual)}</td><td class="r"><span class="pill ${mcls(r.margin)}">${pct(r.margin)}</span></td></tr>`).join('')}
-  </tbody></table></div><div style="padding:16px;font-size:13px;color:var(--mut)">${rows.length} barang · total modal <b>${rp(sum(rows,r=>r.total_modal))}</b></div></div>`;
+  <div class="w" style="padding:0;overflow:hidden"><div class="sc"><table style="min-width:1300px"><thead><tr><th>Tanggal</th><th>No. Nota</th><th>Kategori</th><th>Supplier</th><th>Nama Barang</th><th class="r">Jumlah</th><th>Satuan</th><th class="r">Harga Beli/Unit</th><th class="r">Biaya Angkut</th><th class="r">Total Modal</th><th class="r">HPP/Unit</th><th class="r">Harga Jual/Unit</th><th class="r">Margin (%)</th><th class="r">Potensi Profit</th></tr></thead><tbody>
+   ${rows.map(r=>{const hpp=r.total_modal/r.qty;return `<tr><td>${tgl(r.tanggal)}</td><td>${esc(r.no_nota)}</td><td>${esc(r.kategori)}</td><td>${esc(tc(r.supplier))}</td><td><b>${esc(r.barang)}</b></td><td class="r">${r.qty}</td><td>${esc(r.satuan)}</td><td class="r">${rp(r.harga_beli)}</td><td class="r">${r.biaya_angkut?rp(r.biaya_angkut):'—'}</td><td class="r"><b>${rp(r.total_modal)}</b></td><td class="r">${rp(hpp)}</td><td class="r">${r.harga_jual==null?'—':rp(r.harga_jual)}</td><td class="r">${r.margin==null?'—':pct(r.margin,2)}</td><td class="r">${r.harga_jual==null?'—':rp((r.harga_jual-hpp)*r.qty)}</td></tr>`}).join('')}
+   <tr style="font-weight:700;background:#F6F8F5"><td colspan="5">TOTAL</td><td class="r">${sum(rows,r=>r.qty)}</td><td></td><td class="r">${rp(sum(rows,r=>r.harga_beli))}</td><td class="r">${rp(sum(rows,r=>r.biaya_angkut))}</td><td class="r">${rp(sum(rows,r=>r.total_modal))}</td><td colspan="3"></td><td class="r">${rp(sum(rows,r=>r.harga_jual==null?0:(r.harga_jual-r.total_modal/r.qty)*r.qty))}</td></tr>
+  </tbody></table></div><div style="padding:16px;font-size:13px;color:var(--mut)">${rows.length} baris. Baris TOTAL mengikuti baris TOTAL di Excel (Jumlah, Harga Beli/Unit, Biaya Angkut, Total Modal, Potensi Profit).</div></div>`;
 }
 function vSupplier(){
   return `<header><div class="eyebrow">Supplier & Pemasukan</div><h1>Pemasok dan uang masuk</h1></header>
-  <section class="wg">${st.supplier.map(s=>{const t=st.kulakan.filter(r=>r.supplier===s.nama);return `<div class="w s4"><h3>${esc(tc(s.nama))}</h3><div class="sub">${esc(tc(s.kategori))}</div><p style="line-height:1.6;margin:0">${esc(tc(s.lokasi))||'Alamat belum diisi'}<br>${esc(s.telp)||'Nomor belum diisi'}</p><div><span class="pill ${s.pembayaran==='CASH'?'g':s.pembayaran?'y':'n'}">${esc(s.pembayaran)||'Syarat bayar belum diisi'}</span></div><div style="margin-top:auto;border-top:1px solid var(--bg);padding-top:12px;font-size:13px;display:flex;justify-content:space-between"><span>${t.length} barang</span><b>${rp(sum(t,r=>r.total_modal))}</b></div></div>`}).join('')}</section>
+  <section class="wg">${st.supplier.map(s=>{const t=st.kulakan.filter(r=>r.supplier===s.nama);return `<div class="w s4"><h3>${esc(tc(s.nama))}</h3><div class="sub">${esc(tc(s.kategori))}</div><p style="line-height:1.6;margin:0">${esc(tc(s.lokasi))||'Alamat belum diisi'}<br>${esc(s.telp)||'Nomor belum diisi'}</p><div><span class="pill ${s.pembayaran==='CASH'?'g':s.pembayaran?'y':'n'}">${esc(s.pembayaran)||'Syarat bayar belum diisi'}</span></div><div style="margin-top:auto;border-top:1px solid var(--bg);padding-top:12px;font-size:13px;display:flex;justify-content:space-between"><span>${t.length} barang</span><b>${rp(sum(t,r=>Number(r.qty)*Number(r.harga_beli)))}</b></div></div>`}).join('')}</section>
   <div class="w"><h3>Pemasukan harian</h3>
-   <form id="kx-fp"><label>Tanggal<input type="date" name="tanggal" required></label><label>Pemasukan<input name="pemasukan" type="number" required></label><label>Keuntungan<input name="keuntungan" type="number"></label><button class="btn">Catat</button></form>
-   <div class="sc"><table><thead><tr><th>Tanggal</th><th class="r">Pemasukan</th><th class="r">Keuntungan</th></tr></thead><tbody>${st.pemasukan.map(p=>`<tr><td>${tgl(p.tanggal)}</td><td class="r"><b>${rp(p.pemasukan)}</b></td><td class="r">${p.keuntungan?rp(p.keuntungan):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
+   <form id="kx-fp"><label>Tanggal<input type="date" name="tanggal" required></label><label>Pemasukan<input name="pemasukan" type="number" required></label><button class="btn">Catat</button></form>
+   <div class="sc"><table><thead><tr><th>Tanggal</th><th class="r">Pemasukan</th></tr></thead><tbody>${st.pemasukan.map(p=>`<tr><td>${tgl(p.tanggal)}</td><td class="r"><b>${rp(p.pemasukan)}</b></td></tr>`).join('')}<tr><td><b>Total pemasukan</b></td><td class="r"><b>${rp(sum(st.pemasukan,p=>p.pemasukan))}</b></td></tr></tbody></table></div><p style="font-size:13px;color:var(--mut);margin:0">Total keuntungan (rumus Excel) = total pemasukan − total pengeluaran kulakan = <b>${rp(sum(st.pemasukan,p=>p.pemasukan)-sum(st.kulakan,r=>r.total_modal))}</b></p></div>`;
 }
 
 
@@ -163,7 +176,7 @@ function draw(){
   if($('kx-fp')) $('kx-fp').onsubmit=e=>save(e,'pemasukan');
   if($('kx-fk')){ $('kx-fk').onchange=e=>{st.fk=e.target.value;draw()}; $('kx-fs').onchange=e=>{st.fs=e.target.value;draw()};
     $('kx-tp').onclick=()=>{st.panel=!st.panel;draw()};
-    $('kx-panel').onchange=e=>{const id=e.target.dataset.w;st.hidden=e.target.checked?st.hidden.filter(x=>x!==id):[...st.hidden,id];store('kx-hidden',st.hidden);draw()}; }
+    $('kx-panel').onchange=e=>{const id=e.target.dataset.w;st.hidden=e.target.checked?st.hidden.filter(x=>x!==id):[...st.hidden,id];store('kx-hidden2',st.hidden);draw()}; }
 }
 async function save(e,table){
   e.preventDefault();
@@ -184,7 +197,7 @@ async function importExcel(file){
   try{
     const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
     let kul=sheetRows(wb,'Detail Kulakan').filter(r=>typeof r[0]==='number'&&typeof r[1]==='number'&&r[5]).map(r=>({tanggal:ymd(r[1]),no_nota:String(r[2]??'-'),kategori:r[3],supplier:ALIAS[String(r[4]).trim().toUpperCase()]||String(r[4]).trim().toUpperCase(),barang:r[5],qty:r[6],satuan:r[7],harga_beli:r[8],biaya_angkut:r[9]||0,harga_jual:r[12],isi_per_satuan:r[13]}));
-    const pem=sheetRows(wb,'Pemasukan').filter(r=>typeof r[0]==='number'&&typeof r[2]==='number').map(r=>({tanggal:ymd(r[0]),pemasukan:r[2],keuntungan:r[1]}));
+    const pem=sheetRows(wb,'Pemasukan').filter(r=>typeof r[0]==='number'&&typeof r[2]==='number').map(r=>({tanggal:ymd(r[0]),pemasukan:r[2],keuntungan:null}));
     const sup=sheetRows(wb,'Master Supplier').filter(r=>typeof r[1]==='number'&&r[2]).map(r=>({nama:String(r[2]).trim().toUpperCase(),kategori:r[3],kontak:r[4],telp:r[5]?String(r[5]):null,lokasi:r[6],pembayaran:r[7]}));
     if(!kul.length) return toast('Sheet "Detail Kulakan" tidak berisi data.','error');
     // supplier yang belum ada di master ikut dibuat
