@@ -26,6 +26,7 @@ The Worker is configured to use its `workers.dev` URL; attach a custom domain la
 - Importing the `Detail Kulakan` and `Master Supplier` sheets replaces the kulakan rows and updates suppliers. It also stores one `[DETAIL_STRUK]` expense per supplier, date, and invoice in `transactions`, including product lines and freight. Re-importing the same invoice updates its existing record; expense history not present in the new file is retained.
 - The import cannot safely infer whether an existing, manually entered expense is already represented by the Excel file. Check for any such manual entries before importing to avoid counting that purchase twice in the financial ledger.
 - In the `Buku Kulakan` tab, the owner can edit or delete an individual row. Deleting a row does not remove the associated expense receipt archive.
+- The `Buku Kulakan` list can be narrowed by supplier, date range, category, and item/invoice search. Editing opens in a dialog so the list position is preserved.
 
 ## Local verification
 

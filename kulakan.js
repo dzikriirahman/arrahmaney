@@ -17,7 +17,7 @@ const store=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(
 
 
 
-const st={kulakan:[],supplier:[],sub:'ringkasan',q:'',kat:'Semua',fk:'Semua',fs:'Semua',editId:null,panel:false,hidden:store('kx-hidden2'),loaded:false,error:''};
+const st={kulakan:[],supplier:[],sub:'ringkasan',q:'',kat:'Semua',bookSupplier:'',dateFrom:'',dateTo:'',fk:'Semua',fs:'Semua',editId:null,panel:false,hidden:store('kx-hidden2'),loaded:false,error:''};
 const root=()=>document.getElementById('kulakan-root');
 const $=id=>document.getElementById(id);
 const toast=(m,t)=>{ if(window.showToast) window.showToast(m,t||'success'); else alert(m); };
@@ -131,12 +131,8 @@ function vRingkasan(){
    <div class="wg">${vis.map(w=>`<section class="w s${w.s}${w.dark?' dark':''}">${w.x?'<span class="pill n" style="align-self:flex-start;font-size:11px">Tambahan · bukan rumus Excel</span>':''}${w.r(c)}</section>`).join('')}</div>
    <div style="font-size:12px;color:#4D6B5D">Rumus per satuan yang sama: total modal = (jumlah × harga beli) + ongkos; HPP/unit = total modal ÷ jumlah; laba kotor = (harga jual − HPP/unit) × jumlah; margin kotor = laba kotor ÷ nilai jual. Margin negatif berarti harga jual berada di bawah HPP, bukan otomatis kesalahan rumus—pastikan satuan harga beli, jumlah, dan harga jual konsisten. Widget bertanda &quot;Tambahan&quot; dapat diatur; angka mengikuti filter kategori/supplier.</div>`;
 }
-function vBuku(){
-  const kats=['Semua',...new Set(st.kulakan.map(r=>r.kategori))];
-  const rows=st.kulakan.filter(r=>(st.kat==='Semua'||r.kategori===st.kat)&&(r.barang+r.no_nota).toLowerCase().includes(st.q.toLowerCase())).map(rowEconomics);
-  const editing=st.editId==null?null:st.kulakan.find(r=>String(r.id)===String(st.editId));
-  return `<header><div class="eyebrow">Buku Kulakan</div><h1>Semua barang yang masuk</h1></header>
-  <div class="w"><h3>${editing?'Edit barang kulakan':'Tambah barang kulakan'}</h3><div class="sub">${editing?'Perubahan disimpan pada baris yang dipilih.':'Isi data barang baru untuk menambahkannya ke buku kulakan.'}</div><form id="kx-f">
+function kulakanForm(editing,id){
+  return `<form id="${id}">
    <label>Tanggal<input type="date" name="tanggal" required value="${esc(editing?.tanggal||new Date().toISOString().slice(0,10))}"></label>
    <label>No. Nota<input name="no_nota" value="${esc(editing?.no_nota||'')}"></label>
    <label>Barang<input name="barang" required value="${esc(editing?.barang||'')}"></label>
@@ -147,13 +143,26 @@ function vBuku(){
    <label>Harga beli / unit<input name="harga_beli" type="number" min="0.01" step="any" required value="${editing?esc(editing.harga_beli):''}"></label>
    <label>Biaya angkut<input name="biaya_angkut" type="number" min="0" step="any" value="${editing?esc(editing.biaya_angkut||0):'0'}"></label>
    <label>Harga jual / unit<input name="harga_jual" type="number" min="0.01" step="any" value="${editing&&editing.harga_jual!=null?esc(editing.harga_jual):''}"></label>
-   <div class="k-form-actions"><button class="btn" type="submit">${editing?'Simpan perubahan':'Tambah barang'}</button>${editing?'<button class="ghost" type="button" id="kx-cancel-edit">Batal</button>':''}</div></form></div>
-  <div style="display:flex;flex-wrap:wrap;gap:12px"><input id="kx-q" placeholder="Cari barang atau nota" value="${esc(st.q)}" style="flex:1 1 260px" aria-label="Cari">
-   <select id="kx-kat" aria-label="Kategori">${kats.map(c=>`<option ${c===st.kat?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+   <div class="k-form-actions"><button class="btn" type="submit">${editing?'Simpan perubahan':'Tambah barang'}</button>${editing?'<button class="ghost" type="button" id="kx-cancel-edit">Batal</button>':''}</div></form>`;
+}
+function vBuku(){
+  const kats=['Semua',...new Set(st.kulakan.map(r=>r.kategori))];
+  const bookSuppliers=[...new Set(st.kulakan.map(r=>r.supplier).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const rows=st.kulakan.filter(r=>(st.kat==='Semua'||r.kategori===st.kat)&&(!st.bookSupplier||r.supplier===st.bookSupplier)&&(!st.dateFrom||r.tanggal>=st.dateFrom)&&(!st.dateTo||r.tanggal<=st.dateTo)&&(r.barang+r.no_nota).toLowerCase().includes(st.q.toLowerCase())).map(rowEconomics);
+  return `<header><div class="eyebrow">Buku Kulakan</div><h1>Semua barang yang masuk</h1></header>
+  <div class="w"><h3>Tambah barang kulakan</h3><div class="sub">Isi data barang baru untuk menambahkannya ke buku kulakan.</div>${kulakanForm(null,'kx-f')}</div>
+  <div class="k-book-filters" role="search" aria-label="Filter Buku Kulakan">
+   <label class="k-book-search">Cari barang / nota<input id="kx-q" placeholder="Nama barang atau nomor nota" value="${esc(st.q)}" aria-label="Cari barang atau nota"></label>
+   <label>Supplier<select id="kx-book-supplier" aria-label="Filter supplier"><option value="">Semua supplier</option>${bookSuppliers.map(s=>`<option value="${esc(s)}" ${s===st.bookSupplier?'selected':''}>${esc(tc(s))}</option>`).join('')}</select></label>
+   <label>Dari tanggal<input id="kx-date-from" type="date" value="${esc(st.dateFrom)}" aria-label="Tanggal mulai"></label>
+   <label>Sampai tanggal<input id="kx-date-to" type="date" value="${esc(st.dateTo)}" aria-label="Tanggal akhir"></label>
+   <label>Kategori<select id="kx-kat" aria-label="Filter kategori">${kats.map(c=>`<option ${c===st.kat?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+   <button class="ghost k-book-filter-reset" type="button" id="kx-filter-reset" ${st.q||st.bookSupplier||st.dateFrom||st.dateTo||st.kat!=='Semua'?'':'disabled'}>Reset filter</button>
+  </div>
   <div class="w" style="padding:0;overflow:hidden"><div class="sc"><table style="min-width:1430px"><thead><tr><th>Tanggal</th><th>No. Nota</th><th>Kategori</th><th>Supplier</th><th>Nama Barang</th><th class="r">Jumlah</th><th>Satuan</th><th class="r">Harga Beli/Unit</th><th class="r">Biaya Angkut</th><th class="r">Total Modal</th><th class="r">HPP/Unit</th><th class="r">Harga Jual/Unit</th><th class="r">Margin (%)</th><th class="r">Potensi Profit</th><th data-owner-only>Aksi</th></tr></thead><tbody>
-  ${rows.map(r=>`<tr><td>${tgl(r.tanggal)}</td><td>${esc(r.no_nota)}</td><td>${esc(r.kategori)}</td><td>${esc(tc(r.supplier))}</td><td><b>${esc(r.barang)}</b></td><td class="r">${r.qty}</td><td>${esc(r.satuan)}</td><td class="r">${rp(r.harga_beli)}</td><td class="r">${r.biaya_angkut?rp(r.biaya_angkut):'—'}</td><td class="r"><b>${rp(r.total_modal)}</b></td><td class="r">${r.hpp==null?'—':rp(r.hpp)}</td><td class="r">${r.harga_jual==null?'—':rp(r.harga_jual)}</td><td class="r">${r.margin==null?'—':pct(r.margin,2)}</td><td class="r">${r.laba==null?'—':rp(r.laba)}</td><td data-owner-only><div class="k-row-actions"><button type="button" class="ghost" data-kulakan-edit="${esc(r.id)}" aria-label="Edit ${esc(r.barang)}"><i class="fas fa-pen"></i><span>Edit</span></button><button type="button" class="ghost" data-kulakan-delete="${esc(r.id)}" aria-label="Hapus ${esc(r.barang)}"><i class="fas fa-trash"></i><span>Hapus</span></button></div></td></tr>`).join('')}
+  ${rows.length?rows.map(r=>`<tr><td>${tgl(r.tanggal)}</td><td>${esc(r.no_nota)}</td><td>${esc(r.kategori)}</td><td>${esc(tc(r.supplier))}</td><td><b>${esc(r.barang)}</b></td><td class="r">${r.qty}</td><td>${esc(r.satuan)}</td><td class="r">${rp(r.harga_beli)}</td><td class="r">${r.biaya_angkut?rp(r.biaya_angkut):'—'}</td><td class="r"><b>${rp(r.total_modal)}</b></td><td class="r">${r.hpp==null?'—':rp(r.hpp)}</td><td class="r">${r.harga_jual==null?'—':rp(r.harga_jual)}</td><td class="r">${r.margin==null?'—':pct(r.margin,2)}</td><td class="r">${r.laba==null?'—':rp(r.laba)}</td><td data-owner-only><div class="k-row-actions"><button type="button" class="ghost" data-kulakan-edit="${esc(r.id)}" aria-label="Edit ${esc(r.barang)}"><i class="fas fa-pen"></i><span>Edit</span></button><button type="button" class="ghost" data-kulakan-delete="${esc(r.id)}" aria-label="Hapus ${esc(r.barang)}"><i class="fas fa-trash"></i><span>Hapus</span></button></div></td></tr>`).join(''):`<tr><td colspan="15" style="text-align:center;color:var(--mut);padding:28px">Tidak ada barang yang cocok dengan filter ini.</td></tr>`}
   <tr style="font-weight:700;background:#F6F8F5"><td colspan="5">TOTAL</td><td class="r">${sum(rows,r=>r.qty)}</td><td></td><td class="r" title="Harga satuan tidak dijumlahkan">—</td><td class="r">${rp(sum(rows,r=>r.biaya_angkut))}</td><td class="r">${rp(sum(rows,r=>r.total_modal))}</td><td colspan="3"></td><td class="r">${rp(sum(rows,r=>r.laba))}</td></tr>
-  </tbody></table></div><div style="padding:16px;font-size:13px;color:var(--mut)">${rows.length} baris. Harga beli/unit tidak dijumlahkan karena merupakan harga satuan; total modal sudah menghitung jumlah × harga beli ditambah ongkos.</div></div>`;
+  </tbody></table></div><div style="padding:16px;font-size:13px;color:var(--mut)">Menampilkan ${rows.length} dari ${st.kulakan.length} baris. Harga beli/unit tidak dijumlahkan karena merupakan harga satuan; total modal sudah menghitung jumlah × harga beli ditambah ongkos.</div></div>`;
 }
 function vSupplier(){
   return `<header><div class="eyebrow">Supplier</div><h1>Pemasok</h1></header>
@@ -173,10 +182,13 @@ function draw(){
   r.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{st.sub=b.dataset.sub;draw()});
   $('kx-file').onchange=e=>{const input=e.currentTarget;importExcel(input.files[0]).finally(()=>{input.value=''});};
   if($('kx-q')){ $('kx-q').oninput=e=>{st.q=e.target.value;const p=e.target.selectionStart;draw();const n=$('kx-q');n.focus();n.setSelectionRange(p,p)}; $('kx-kat').onchange=e=>{st.kat=e.target.value;draw()}; }
-  if($('kx-f')) $('kx-f').onsubmit=e=>save(e,'kulakan');
+  if($('kx-book-supplier')) $('kx-book-supplier').onchange=e=>{st.bookSupplier=e.target.value;draw()};
+  if($('kx-date-from')) $('kx-date-from').onchange=e=>{st.dateFrom=e.target.value;draw()};
+  if($('kx-date-to')) $('kx-date-to').onchange=e=>{st.dateTo=e.target.value;draw()};
+  if($('kx-filter-reset')) $('kx-filter-reset').onclick=()=>{st.q='';st.bookSupplier='';st.dateFrom='';st.dateTo='';st.kat='Semua';draw()};
+  if($('kx-f'))$('kx-f').onsubmit=e=>save(e,'kulakan');
   r.querySelectorAll('[data-kulakan-edit]').forEach(button=>button.onclick=()=>startEdit(button.dataset.kulakanEdit));
   r.querySelectorAll('[data-kulakan-delete]').forEach(button=>button.onclick=()=>deleteKulakan(button.dataset.kulakanDelete));
-  if($('kx-cancel-edit')) $('kx-cancel-edit').onclick=()=>{st.editId=null;draw()};
   if($('kx-fk')){ $('kx-fk').onchange=e=>{st.fk=e.target.value;draw()}; $('kx-fs').onchange=e=>{st.fs=e.target.value;draw()};
     $('kx-tp').onclick=()=>{st.panel=!st.panel;draw()};
     $('kx-panel').onchange=e=>{const id=e.target.dataset.w;st.hidden=e.target.checked?st.hidden.filter(x=>x!==id):[...st.hidden,id];store('kx-hidden2',st.hidden);draw()}; }
@@ -195,21 +207,34 @@ async function save(e,table){
   if(response.error){toast((updating?'Gagal memperbarui':'Gagal menyimpan')+': '+response.error.message,'error');return}
   if(updating&&!response.data?.length){toast('Data kulakan tidak diperbarui. Baris mungkin sudah dihapus atau akses Anda berubah.','error');return}
   st.editId=null;
+  if(updating)closeEditDialog();
   const loaded=await load();
   draw();
   if(!loaded){toast('Perubahan tersimpan, tetapi daftar kulakan gagal dimuat ulang. Muat ulang halaman.','error');return}
   toast(updating?'Perubahan kulakan berhasil disimpan.':'Barang kulakan berhasil ditambahkan.');
 }
 
+function closeEditDialog(){
+  const dialog=$('kx-edit-overlay');
+  if(dialog)dialog.remove();
+  st.editId=null;
+}
 function startEdit(id){
   if(!window.isAppOwner||!window.isAppOwner()){toast('Hanya pemilik yang dapat mengubah data.','error');return}
   const row=st.kulakan.find(item=>String(item.id)===String(id));
   if(!row){toast('Baris kulakan tidak ditemukan. Muat ulang data lalu coba lagi.','error');return}
+  closeEditDialog();
   st.editId=row.id;
-  st.sub='buku';
-  draw();
-  const form=$('kx-f');
-  if(form){form.scrollIntoView({behavior:'smooth',block:'center'});form.querySelector('[name="barang"]').focus()}
+  const dialog=document.createElement('div');
+  dialog.id='kx-edit-overlay';
+  dialog.className='k-edit-overlay';
+  dialog.innerHTML=`<section class="k-edit-modal" role="dialog" aria-modal="true" aria-labelledby="kx-edit-title"><div class="k-edit-heading"><div><div class="eyebrow">Buku Kulakan</div><h2 id="kx-edit-title">Edit barang</h2><p>Perbarui data tanpa meninggalkan posisi daftar.</p></div><button type="button" class="ghost" id="kx-close-edit" aria-label="Tutup edit"><i class="fas fa-times"></i></button></div>${kulakanForm(row,'kx-edit-f')}</section>`;
+  document.getElementById('kulakan').appendChild(dialog);
+  $('kx-edit-f').onsubmit=e=>save(e,'kulakan');
+  $('kx-cancel-edit').onclick=closeEditDialog;
+  $('kx-close-edit').onclick=closeEditDialog;
+  dialog.onclick=e=>{if(e.target===dialog)closeEditDialog()};
+  $('kx-close-edit').focus({preventScroll:true});
 }
 
 async function deleteKulakan(id){
