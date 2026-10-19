@@ -474,6 +474,7 @@
   }
 
   async function saveSettings(next) {
+    if (!window.isAppOwner || !window.isAppOwner()) { toast('Hanya pemilik yang dapat mengubah data.', 'error'); return; }
     S.settings = Object.assign({}, S.settings, next);
     try { localStorage.setItem(SETTINGS_LS_KEY, JSON.stringify(S.settings)); } catch (_) {}
     try {
@@ -489,6 +490,7 @@
   }
 
   window.openTargetSettings = function () {
+    if (!window.isAppOwner || !window.isAppOwner()) { toast('Hanya pemilik yang dapat mengubah data.', 'error'); return; }
     if ($('target-modal')) $('target-modal').remove();
     const T = S.settings;
     const wrap = document.createElement('div');
@@ -1079,6 +1081,7 @@
 
   async function addReceivable(e) {
     e.preventDefault();
+    if (!window.isAppOwner || !window.isAppOwner()) { toast('Hanya pemilik yang dapat mengubah data.', 'error'); return; }
     const rec = {
       id: 'RCV-' + Date.now(), tipe: $('d-tipe').value, pihak: $('d-pihak').value.trim(), nominal: Math.round(num($('d-nominal').value)),
       tanggal: $('d-tanggal').value, jatuh_tempo: $('d-tempo').value || null, status: 'belum', catatan: $('d-catatan').value.trim() || null
@@ -1092,6 +1095,7 @@
   }
 
   async function debtAction(act, id) {
+    if (!window.isAppOwner || !window.isAppOwner()) { toast('Aksi ini hanya tersedia untuk pemilik.', 'error'); return; }
     const rec = S.receivables.find(x => String(x.id) === String(id));
     if (!rec) return;
     if (act === 'del') {

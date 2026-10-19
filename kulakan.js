@@ -166,6 +166,7 @@ function draw(){
 }
 async function save(e,table){
   e.preventDefault();
+  if(!window.isAppOwner||!window.isAppOwner()){toast('Hanya pemilik yang dapat mengubah data.','error');return}
   const o=Object.fromEntries(new FormData(e.target));
   for(const k in o){ if(o[k]==='') o[k]=null; else if(NUM.includes(k)) o[k]=Number(o[k]); }
   if(o.supplier) o.supplier=o.supplier.trim().toUpperCase();
@@ -179,6 +180,7 @@ const ALIAS={'SALES BOWO':'GUDANG GARAM','PLASTIK PASAR JTB':'TOKO PLASTIK','SAL
 function ymd(serial){const d=XLSX.SSF.parse_date_code(serial);return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`}
 function sheetRows(wb,name){const ws=wb.Sheets[name];return ws?XLSX.utils.sheet_to_json(ws,{header:1,range:'A1:T400',defval:null}):[]}
 async function importExcel(file){
+  if(!window.isAppOwner||!window.isAppOwner()){toast('Hanya pemilik yang dapat mengubah data.','error');return}
   if(!file) return;
   try{
     const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});

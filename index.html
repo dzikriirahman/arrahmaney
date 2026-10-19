@@ -79,6 +79,14 @@
         .auth-locked header, .auth-locked main { visibility:hidden; }
         #login-screen { position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center; padding:16px; background:linear-gradient(135deg,#064e3b 0%,#0f766e 55%,#134e4a 100%); overflow-y:auto; }
         #login-screen.hidden { display:none; }
+        .app-viewer [data-owner-only], .app-viewer #input,
+        .app-viewer [data-target="input"], .app-viewer #transaction-form,
+        .app-viewer #receipt-save-btn, .app-viewer #receipt-cancel-edit,
+        .app-viewer #adv-targets-btn, .app-viewer [onclick*="openTargetSettings"],
+        .app-viewer #debt-form, .app-viewer [data-d-act],
+        .app-viewer #kx-f, .app-viewer .kx-imp, .app-viewer #kx-tp,
+        .app-viewer [data-transaction-write] { display:none !important; }
+        .app-viewer #expenses > .bg-white:first-child > .grid { display:none !important; }
         /* Dashboard penasihat */
         .adv-card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
         .adv-kicker { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#94a3b8; }
@@ -96,7 +104,7 @@
     <link rel="stylesheet" href="kulakan.css">
 </head>
 <body class="auth-locked text-slate-800 antialiased min-h-screen md:h-screen flex flex-col md:overflow-hidden">
-    <!-- LOGIN: aplikasi baru memuat data setelah pengguna berhasil masuk -->
+    <!-- Login opsional untuk akses edit pemilik; pengunjung tanpa akun dapat melihat data. -->
     <div id="login-screen" role="dialog" aria-modal="true" aria-labelledby="login-title">
         <div class="w-full max-w-md">
             <div class="text-center text-white mb-6">
@@ -108,7 +116,7 @@
             <!-- Tampilan: masuk -->
             <form id="login-form" class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8" novalidate>
                 <h2 class="text-lg font-bold text-slate-900">Masuk</h2>
-                <p class="text-xs text-slate-500 mb-5">Hanya untuk pengguna terdaftar. Hubungi pemilik toko jika belum punya akun.</p>
+                <p class="text-xs text-slate-500 mb-5">Masuk sebagai pemilik untuk mengubah data. Pengunjung dapat melihat data tanpa masuk.</p>
                 <label for="login-email" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Email</label>
                 <input id="login-email" type="email" autocomplete="username" inputmode="email" required class="w-full mb-4 px-3.5 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="nama@email.com">
                 <label for="login-password" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Password</label>
@@ -174,13 +182,15 @@
             </nav>
             <div id="user-box" class="flex items-center gap-2 ml-auto md:ml-0">
                 <span id="user-email" class="text-xs text-emerald-200 font-medium max-w-[180px] truncate"></span>
-                <button type="button" onclick="window.appSignOut && appSignOut()" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5" title="Keluar dari akun" aria-label="Keluar dari akun"><i class="fas fa-sign-out-alt"></i><span class="m-hide-label">Keluar</span></button>
+                <button type="button" id="owner-login-btn" onclick="window.showOwnerLogin && showOwnerLogin()" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5" title="Masuk sebagai pemilik untuk mengedit"><i class="fas fa-sign-in-alt"></i><span>Masuk pemilik</span></button>
+                <button type="button" id="sign-out-btn" onclick="window.appSignOut && appSignOut()" class="hidden px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5" title="Keluar dari akun" aria-label="Keluar dari akun"><i class="fas fa-sign-out-alt"></i><span class="m-hide-label">Keluar</span></button>
             </div>
         </div>
     </header>
 
     <!-- Main Content -->
     <main class="flex-grow overflow-y-auto p-3 sm:p-4 md:p-8 container mx-auto w-full max-w-full">
+        <div id="viewer-notice" class="hidden max-w-5xl mx-auto mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">Mode lihat saja. Siapa pun yang memiliki tautan ini dapat melihat data keuangan; masuk sebagai pemilik untuk mengedit.</div>
         <div id="m-titlebar" class="md:hidden"><h2 id="m-title">Ringkasan</h2><p id="m-subtitle"></p></div>
         <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
 
@@ -389,7 +399,7 @@
             if (tanggalEl) tanggalEl.valueAsDate = new Date();
             updateKategoriOptions();
             if (supabaseClient) {
-                if (window.initAuth) window.initAuth(); // data dimuat setelah login berhasil
+                if (window.initAuth) window.initAuth();
             } else {
                 showToast("SDK Supabase gagal dimuat!", "error");
             }
@@ -504,6 +514,7 @@
             if(status)status.textContent='Pilih foto khusus untuk '+receiptOcrStages[stage].label.toLowerCase()+', lalu deteksi. Teks mentah tetap bisa diedit sebelum diterapkan.';
         };
         window.applyReceiptOcrStage = function() {
+            if (!window.isAppOwner || !window.isAppOwner()) { showToast('Hanya pemilik yang dapat mengubah data.','error'); return; }
             const raw=document.getElementById('receipt-raw-text'), status=document.getElementById('receipt-ocr-status');
             const lines=String(raw?raw.value:'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
             if(!lines.length){showToast('Teks kosong. Deteksi atau ketik teks untuk tahap ini terlebih dahulu.','error');return;}
@@ -887,6 +898,7 @@
             });
         }
         window.scanReceipt = async function() {
+            if (!window.isAppOwner || !window.isAppOwner()) { showToast('Fitur OCR hanya tersedia untuk pemilik.','error'); return; }
             const earlyStatus = document.getElementById('receipt-ocr-status');
             if (earlyStatus) earlyStatus.textContent = 'Fungsi OCR berjalan. Memeriksa foto…';
             const file = window.selectedReceiptFile || document.getElementById('receipt-camera-file').files?.[0] || document.getElementById('receipt-gallery-file').files?.[0];
@@ -915,7 +927,7 @@
                 tickerId = setInterval(() => {
                     if (status) status.textContent = 'Menunggu balasan Gemini AI… (' + Math.round((Date.now() - startedAt) / 1000) + ' dtk, batas 40 dtk)';
                 }, 1000);
-                const authHeaders = { 'Content-Type':'application/json' };
+                const authHeaders = { 'Content-Type':'application/json', apikey:SUPABASE_ANON_KEY };
                 try {
                     const sessionResult = await supabaseClient.auth.getSession();
                     const accessToken = sessionResult && sessionResult.data && sessionResult.data.session && sessionResult.data.session.access_token;
@@ -927,14 +939,14 @@
                     body:JSON.stringify({ imageBase64:imageBase64, mimeType:'image/jpeg', stage:receiptOcrStage }),
                     signal:controller.signal
                 });
-                // Netlify mengembalikan halaman teks/HTML (bukan JSON) saat fungsi habis waktu atau tidak ditemukan.
+                // Server dapat mengembalikan teks/HTML jika fungsi tidak tersedia atau timeout.
                 const rawBody = await response.text();
                 let payload = {};
                 try { payload = JSON.parse(rawBody); } catch (_) {}
                 if (!response.ok) {
                     if (response.status === 401) throw new Error(payload.error || 'Sesi login berakhir. Silakan masuk kembali.');
-                    if (response.status === 404) throw new Error('Fungsi OCR tidak ditemukan di server. Pastikan folder netlify/functions ikut ter-deploy.');
-                    if (!payload.error && (response.status === 502 || response.status === 504)) throw new Error('Server Netlify memutus fungsi OCR karena terlalu lama (HTTP ' + response.status + '). Crop foto lebih dekat lalu coba lagi.');
+                    if (response.status === 404) throw new Error('Fungsi OCR tidak ditemukan di server. Pastikan Worker Cloudflare sudah ter-deploy.');
+                    if (!payload.error && (response.status === 502 || response.status === 504)) throw new Error('Server memutus fungsi OCR karena terlalu lama (HTTP ' + response.status + '). Crop foto lebih dekat lalu coba lagi.');
                     throw new Error((payload.error || 'Layanan OCR gagal (HTTP ' + response.status + ').') + (payload.detail ? ' [' + payload.detail + ']' : ''));
                 }
                 const text = String(payload.text || '').trim();
@@ -949,7 +961,7 @@
             } catch (err) {
                 console.error('Gemini receipt OCR error:',err);
                 const message = err && err.name === 'AbortError'
-                    ? 'Tidak ada balasan dari server dalam 40 detik. Crop foto lebih dekat ke bagian struk lalu coba lagi; jika berulang, buka Netlify > Logs > Functions untuk melihat penyebabnya.'
+                    ? 'Tidak ada balasan dari server dalam 40 detik. Crop foto lebih dekat ke bagian struk lalu coba lagi; jika berulang, periksa log Worker Cloudflare.'
                     : (err && err.message ? err.message : 'kesalahan tidak diketahui');
                 if (status) status.textContent = 'OCR Gemini gagal: ' + message;
                 showToast(message,'error');
@@ -960,6 +972,7 @@
             }
         };
         window.saveReceiptExpense = async function() {
+            if (!window.isAppOwner || !window.isAppOwner()) { showToast('Hanya pemilik yang dapat mengubah data.','error'); return; }
             const date = document.getElementById('receipt-date').value;
             const total = Number(document.getElementById('receipt-total').value) || 0;
             const invoice = document.getElementById('receipt-invoice').value.trim();
@@ -1011,6 +1024,7 @@
             catch (e) { return {}; }
         }
         window.editReceiptExpense = function(id) {
+            if (!window.isAppOwner || !window.isAppOwner()) { showToast('Rincian edit hanya tersedia untuk pemilik.','error'); return; }
             const t = transactions.find(row => String(row.id) === String(id));
             if (!t) { showToast('Data struk tidak ditemukan. Muat ulang data cloud.','error'); return; }
             const detail = parseSavedReceipt(t);
@@ -1072,6 +1086,7 @@
 
         window.handleFormSubmit = async function(e) {
             e.preventDefault();
+            if (!window.isAppOwner || !window.isAppOwner()) { showToast('Hanya pemilik yang dapat mengubah data.','error'); return; }
             const nominalEl = document.getElementById('nominal');
             const nominal = nominalEl ? parseInt(nominalEl.value, 10) : 0;
             if (!nominal || nominal <= 0) {
@@ -1106,6 +1121,7 @@
         };
 
         window.deleteTransaction = async function(id) {
+            if (!window.isAppOwner || !window.isAppOwner()) { showToast('Hanya pemilik yang dapat mengubah data.','error'); return; }
             if (confirm("Apakah Anda yakin ingin menghapus transaksi ini dari Cloud?")) {
                 const { error } = await supabaseClient
                     .from('transactions')
@@ -1341,8 +1357,10 @@
                 const sign = isPemasukan ? '+' : '-';
                 const dateStr = new Date(trx.tanggal).toLocaleDateString('id-ID', {day:'numeric',month:'short',year:'numeric'});
                 const detailReceipt = String(trx.keterangan || '').startsWith('[DETAIL_STRUK]');
-                const actionHtml = (detailReceipt ? '<button onclick="editReceiptExpense(\''+receiptEsc(trx.id)+'\')" class="text-emerald-600 hover:text-emerald-800 p-2 rounded-lg" title="Lihat/edit detail struk"><i class="fas fa-eye"></i></button>' : '') +
-                    '<button onclick="deleteTransaction(\''+receiptEsc(trx.id)+'\')" class="text-slate-400 hover:text-rose-600 p-2 rounded-lg" title="Hapus"><i class="fas fa-trash"></i></button>';
+                const actionHtml = window.isAppOwner && window.isAppOwner()
+                    ? (detailReceipt ? '<button onclick="editReceiptExpense(\''+receiptEsc(trx.id)+'\')" class="text-emerald-600 hover:text-emerald-800 p-2 rounded-lg" title="Lihat/edit detail struk"><i class="fas fa-eye"></i></button>' : '') +
+                      '<button onclick="deleteTransaction(\''+receiptEsc(trx.id)+'\')" class="text-slate-400 hover:text-rose-600 p-2 rounded-lg" title="Hapus"><i class="fas fa-trash"></i></button>'
+                    : '';
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50 transition-colors';
                 tr.innerHTML = '<td class="p-4 text-slate-600 whitespace-nowrap text-xs font-medium">'+dateStr+'</td>' +

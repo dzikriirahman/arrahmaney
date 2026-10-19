@@ -1,14 +1,16 @@
 // Login untuk aplikasi keuangan AR-Rahman (Supabase Auth, email + password).
 //
 // Catatan keamanan penting:
-//  - Layar login ini hanya mengatur tampilan. Yang benar-benar melindungi data adalah RLS di Supabase.
-//    Jalankan supabase-setup.sql agar tabel hanya bisa diakses pengguna yang sudah login.
+//  - Layar login ini hanya mengatur tampilan. RLS Supabase yang membatasi tulis ke pemilik.
+//    Jalankan supabase-public-viewer.sql agar pengunjung bisa membaca tanpa login dan hanya pemilik bisa menulis.
 //  - Matikan pendaftaran publik di Supabase (Authentication > Sign In / Providers > "Allow new users to sign up"),
 //    lalu buat akun pengguna secara manual lewat Authentication > Users > Add user.
 (function () {
   'use strict';
   const $ = id => document.getElementById(id);
+  const OWNER_EMAIL = 'dzikrii.rahman@gmail.com';
   let currentUserId = null;
+  let accessApplied = false;
   let booted = false;
 
   function setMessage(el, text, kind) {
@@ -57,21 +59,57 @@
     setMessage($('login-message'), '');
   }
 
+  function setRole(session) {
+    const email = String(session && session.user && session.user.email || '').trim().toLowerCase();
+    const isOwner = !!email && email === OWNER_EMAIL;
+    document.body.dataset.appRole = isOwner ? 'owner' : 'viewer';
+    document.body.classList.toggle('app-viewer', !isOwner);
+    const signIn = $('owner-login-btn');
+    const signOut = $('sign-out-btn');
+    const viewerNotice = $('viewer-notice');
+    if (signIn) signIn.classList.toggle('hidden', !!(session && session.user));
+    if (signOut) signOut.classList.toggle('hidden', !(session && session.user));
+    if (viewerNotice) viewerNotice.classList.toggle('hidden', isOwner);
+    return isOwner;
+  }
+
+  window.isAppOwner = function () {
+    return document.body.dataset.appRole === 'owner';
+  };
+
+  window.showOwnerLogin = function () {
+    showView('login');
+    const screen = $('login-screen');
+    if (screen) screen.classList.remove('hidden');
+    const email = $('login-email');
+    if (email) email.focus();
+  };
+
   function loadEverything() {
     if (typeof window.loadDataFromSupabase === 'function') window.loadDataFromSupabase();
     if (window.loadAdvisorData) window.loadAdvisorData();
   }
 
   function applySession(session) {
+    const previousUserId = currentUserId;
+    const userId = session && session.user ? session.user.id : null;
+    const shouldLoad = !accessApplied || currentUserId !== userId;
+    accessApplied = true;
+    currentUserId = userId;
+    setRole(session);
+
     if (session && session.user) {
-      const isNewUser = currentUserId !== session.user.id;
-      currentUserId = session.user.id;
       unlockApp(session);
-      if (isNewUser) loadEverything();
+      if (shouldLoad) loadEverything();
     } else {
-      currentUserId = null;
-      lockApp();
-      showView('login');
+      document.body.classList.remove('auth-locked');
+      const screen = $('login-screen');
+      if (screen) screen.classList.add('hidden');
+      if (previousUserId) {
+        try { if (typeof transactions !== 'undefined') transactions.length = 0; } catch (_) {}
+        if (window.clearAdvisorData) window.clearAdvisorData();
+      }
+      if (shouldLoad) loadEverything();
     }
   }
 

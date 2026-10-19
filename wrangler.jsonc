@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "arrahman",
+  "main": "worker.js",
+  "compatibility_date": "2025-03-01",
+  "build": {
+    "command": "npm run build"
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/.netlify/functions/gemini-receipt-ocr"]
+  },
+  "vars": {
+    "OWNER_EMAIL": "dzikrii.rahman@gmail.com"
+  }
+}
