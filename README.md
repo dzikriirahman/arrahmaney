@@ -17,6 +17,7 @@ The production target is the Cloudflare Worker named `arrahman`. The app continu
 4. Confirm the production build succeeds before changing the public URL or disabling Netlify.
 
 The build copies only the browser application and icons into `dist`; SQL setup files and the original Netlify function are not published as static files. The Worker routes the existing `/.netlify/functions/gemini-receipt-ocr` URL to an owner-authenticated Cloudflare handler.
+The Worker is configured to use its `workers.dev` URL; attach a custom domain later if one is desired and available in this Cloudflare account.
 
 ## Local verification
 
