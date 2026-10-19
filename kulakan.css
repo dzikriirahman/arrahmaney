@@ -39,6 +39,10 @@
 #kulakan button.ghost{font-weight:600;cursor:pointer}
 #kulakan form{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:end}
 #kulakan form label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:var(--mut)}
+#kulakan .k-form-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px}
+#kulakan .k-row-actions{display:flex;gap:6px;white-space:nowrap}
+#kulakan .k-row-actions button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 10px;min-height:38px;font-size:12px}
+#kulakan .k-row-actions [data-kulakan-delete]{color:#a63d2c;border-color:#ebc8bf}
 #kulakan .row{display:flex;flex-direction:column;gap:5px}
 #kulakan .row .l{display:flex;justify-content:space-between;gap:10px;font-size:14px}
 #kulakan .row .l span{color:var(--mut);white-space:nowrap}
@@ -56,6 +60,7 @@
 }
 @media(max-width:700px){#kulakan h1{font-size:30px}
 #kulakan .s3{grid-column:span 12}
+#kulakan .k-form-actions button{flex:1 1 150px}
 }
 
 #kulakan #kulakan-root{display:flex;flex-direction:column;gap:24px}

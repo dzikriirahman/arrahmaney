@@ -17,7 +17,7 @@ const store=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(
 
 
 
-const st={kulakan:[],supplier:[],sub:'ringkasan',q:'',kat:'Semua',fk:'Semua',fs:'Semua',panel:false,hidden:store('kx-hidden2'),loaded:false,error:''};
+const st={kulakan:[],supplier:[],sub:'ringkasan',q:'',kat:'Semua',fk:'Semua',fs:'Semua',editId:null,panel:false,hidden:store('kx-hidden2'),loaded:false,error:''};
 const root=()=>document.getElementById('kulakan-root');
 const $=id=>document.getElementById(id);
 const toast=(m,t)=>{ if(window.showToast) window.showToast(m,t||'success'); else alert(m); };
@@ -30,7 +30,7 @@ async function load(){
     supabaseClient.from('supplier_kulakan').select('*').order('nama')]);
   const err=k.error||s.error;
   if(err){ st.error=/relation|does not exist|schema cache/i.test(err.message)?'Tabel kulakan belum dibuat. Jalankan kulakan-setup.sql di Supabase SQL Editor.':err.message; return; }
-  st.error='';Object.assign(st,{kulakan:k.data,supplier:s.data,loaded:true});
+  st.error='';Object.assign(st,{kulakan:k.data,supplier:s.data,loaded:true});return true;
 }
 
 /* ---------- chart helpers ---------- */
@@ -134,22 +134,24 @@ function vRingkasan(){
 function vBuku(){
   const kats=['Semua',...new Set(st.kulakan.map(r=>r.kategori))];
   const rows=st.kulakan.filter(r=>(st.kat==='Semua'||r.kategori===st.kat)&&(r.barang+r.no_nota).toLowerCase().includes(st.q.toLowerCase())).map(rowEconomics);
+  const editing=st.editId==null?null:st.kulakan.find(r=>String(r.id)===String(st.editId));
   return `<header><div class="eyebrow">Buku Kulakan</div><h1>Semua barang yang masuk</h1></header>
-  <div class="w"><form id="kx-f">
-   <label>Tanggal<input type="date" name="tanggal" required value="${new Date().toISOString().slice(0,10)}"></label>
-   <label>Barang<input name="barang" required></label>
-   <label>Supplier<input name="supplier" list="kx-sl" required><datalist id="kx-sl">${st.supplier.map(s=>`<option>${esc(s.nama)}</option>`).join('')}</datalist></label>
-   <label>Kategori<input name="kategori"></label>
-   <label>Jumlah<input name="qty" type="number" step="any" required></label>
-   <label>Satuan<input name="satuan"></label>
-   <label>Harga beli / unit<input name="harga_beli" type="number" required></label>
-   <label>Biaya angkut<input name="biaya_angkut" type="number" value="0"></label>
-   <label>Harga jual / unit<input name="harga_jual" type="number"></label>
-   <button class="btn">Simpan</button></form></div>
+  <div class="w"><h3>${editing?'Edit barang kulakan':'Tambah barang kulakan'}</h3><div class="sub">${editing?'Perubahan disimpan pada baris yang dipilih.':'Isi data barang baru untuk menambahkannya ke buku kulakan.'}</div><form id="kx-f">
+   <label>Tanggal<input type="date" name="tanggal" required value="${esc(editing?.tanggal||new Date().toISOString().slice(0,10))}"></label>
+   <label>No. Nota<input name="no_nota" value="${esc(editing?.no_nota||'')}"></label>
+   <label>Barang<input name="barang" required value="${esc(editing?.barang||'')}"></label>
+   <label>Supplier<input name="supplier" list="kx-sl" required value="${esc(editing?.supplier||'')}"><datalist id="kx-sl">${st.supplier.map(s=>`<option>${esc(s.nama)}</option>`).join('')}</datalist></label>
+   <label>Kategori<input name="kategori" value="${esc(editing?.kategori||'')}"></label>
+   <label>Jumlah<input name="qty" type="number" min="0.000001" step="any" required value="${editing?esc(editing.qty):''}"></label>
+   <label>Satuan<input name="satuan" value="${esc(editing?.satuan||'')}"></label>
+   <label>Harga beli / unit<input name="harga_beli" type="number" min="0.01" step="any" required value="${editing?esc(editing.harga_beli):''}"></label>
+   <label>Biaya angkut<input name="biaya_angkut" type="number" min="0" step="any" value="${editing?esc(editing.biaya_angkut||0):'0'}"></label>
+   <label>Harga jual / unit<input name="harga_jual" type="number" min="0.01" step="any" value="${editing&&editing.harga_jual!=null?esc(editing.harga_jual):''}"></label>
+   <div class="k-form-actions"><button class="btn" type="submit">${editing?'Simpan perubahan':'Tambah barang'}</button>${editing?'<button class="ghost" type="button" id="kx-cancel-edit">Batal</button>':''}</div></form></div>
   <div style="display:flex;flex-wrap:wrap;gap:12px"><input id="kx-q" placeholder="Cari barang atau nota" value="${esc(st.q)}" style="flex:1 1 260px" aria-label="Cari">
    <select id="kx-kat" aria-label="Kategori">${kats.map(c=>`<option ${c===st.kat?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
-  <div class="w" style="padding:0;overflow:hidden"><div class="sc"><table style="min-width:1300px"><thead><tr><th>Tanggal</th><th>No. Nota</th><th>Kategori</th><th>Supplier</th><th>Nama Barang</th><th class="r">Jumlah</th><th>Satuan</th><th class="r">Harga Beli/Unit</th><th class="r">Biaya Angkut</th><th class="r">Total Modal</th><th class="r">HPP/Unit</th><th class="r">Harga Jual/Unit</th><th class="r">Margin (%)</th><th class="r">Potensi Profit</th></tr></thead><tbody>
-  ${rows.map(r=>`<tr><td>${tgl(r.tanggal)}</td><td>${esc(r.no_nota)}</td><td>${esc(r.kategori)}</td><td>${esc(tc(r.supplier))}</td><td><b>${esc(r.barang)}</b></td><td class="r">${r.qty}</td><td>${esc(r.satuan)}</td><td class="r">${rp(r.harga_beli)}</td><td class="r">${r.biaya_angkut?rp(r.biaya_angkut):'—'}</td><td class="r"><b>${rp(r.total_modal)}</b></td><td class="r">${r.hpp==null?'—':rp(r.hpp)}</td><td class="r">${r.harga_jual==null?'—':rp(r.harga_jual)}</td><td class="r">${r.margin==null?'—':pct(r.margin,2)}</td><td class="r">${r.laba==null?'—':rp(r.laba)}</td></tr>`).join('')}
+  <div class="w" style="padding:0;overflow:hidden"><div class="sc"><table style="min-width:1430px"><thead><tr><th>Tanggal</th><th>No. Nota</th><th>Kategori</th><th>Supplier</th><th>Nama Barang</th><th class="r">Jumlah</th><th>Satuan</th><th class="r">Harga Beli/Unit</th><th class="r">Biaya Angkut</th><th class="r">Total Modal</th><th class="r">HPP/Unit</th><th class="r">Harga Jual/Unit</th><th class="r">Margin (%)</th><th class="r">Potensi Profit</th><th data-owner-only>Aksi</th></tr></thead><tbody>
+  ${rows.map(r=>`<tr><td>${tgl(r.tanggal)}</td><td>${esc(r.no_nota)}</td><td>${esc(r.kategori)}</td><td>${esc(tc(r.supplier))}</td><td><b>${esc(r.barang)}</b></td><td class="r">${r.qty}</td><td>${esc(r.satuan)}</td><td class="r">${rp(r.harga_beli)}</td><td class="r">${r.biaya_angkut?rp(r.biaya_angkut):'—'}</td><td class="r"><b>${rp(r.total_modal)}</b></td><td class="r">${r.hpp==null?'—':rp(r.hpp)}</td><td class="r">${r.harga_jual==null?'—':rp(r.harga_jual)}</td><td class="r">${r.margin==null?'—':pct(r.margin,2)}</td><td class="r">${r.laba==null?'—':rp(r.laba)}</td><td data-owner-only><div class="k-row-actions"><button type="button" class="ghost" data-kulakan-edit="${esc(r.id)}" aria-label="Edit ${esc(r.barang)}"><i class="fas fa-pen"></i><span>Edit</span></button><button type="button" class="ghost" data-kulakan-delete="${esc(r.id)}" aria-label="Hapus ${esc(r.barang)}"><i class="fas fa-trash"></i><span>Hapus</span></button></div></td></tr>`).join('')}
   <tr style="font-weight:700;background:#F6F8F5"><td colspan="5">TOTAL</td><td class="r">${sum(rows,r=>r.qty)}</td><td></td><td class="r" title="Harga satuan tidak dijumlahkan">—</td><td class="r">${rp(sum(rows,r=>r.biaya_angkut))}</td><td class="r">${rp(sum(rows,r=>r.total_modal))}</td><td colspan="3"></td><td class="r">${rp(sum(rows,r=>r.laba))}</td></tr>
   </tbody></table></div><div style="padding:16px;font-size:13px;color:var(--mut)">${rows.length} baris. Harga beli/unit tidak dijumlahkan karena merupakan harga satuan; total modal sudah menghitung jumlah × harga beli ditambah ongkos.</div></div>`;
 }
@@ -172,6 +174,9 @@ function draw(){
   $('kx-file').onchange=e=>{const input=e.currentTarget;importExcel(input.files[0]).finally(()=>{input.value=''});};
   if($('kx-q')){ $('kx-q').oninput=e=>{st.q=e.target.value;const p=e.target.selectionStart;draw();const n=$('kx-q');n.focus();n.setSelectionRange(p,p)}; $('kx-kat').onchange=e=>{st.kat=e.target.value;draw()}; }
   if($('kx-f')) $('kx-f').onsubmit=e=>save(e,'kulakan');
+  r.querySelectorAll('[data-kulakan-edit]').forEach(button=>button.onclick=()=>startEdit(button.dataset.kulakanEdit));
+  r.querySelectorAll('[data-kulakan-delete]').forEach(button=>button.onclick=()=>deleteKulakan(button.dataset.kulakanDelete));
+  if($('kx-cancel-edit')) $('kx-cancel-edit').onclick=()=>{st.editId=null;draw()};
   if($('kx-fk')){ $('kx-fk').onchange=e=>{st.fk=e.target.value;draw()}; $('kx-fs').onchange=e=>{st.fs=e.target.value;draw()};
     $('kx-tp').onclick=()=>{st.panel=!st.panel;draw()};
     $('kx-panel').onchange=e=>{const id=e.target.dataset.w;st.hidden=e.target.checked?st.hidden.filter(x=>x!==id):[...st.hidden,id];store('kx-hidden2',st.hidden);draw()}; }
@@ -181,10 +186,50 @@ async function save(e,table){
   if(!window.isAppOwner||!window.isAppOwner()){toast('Hanya pemilik yang dapat mengubah data.','error');return}
   const o=Object.fromEntries(new FormData(e.target));
   for(const k in o){ if(o[k]==='') o[k]=null; else if(NUM.includes(k)) o[k]=Number(o[k]); }
+  if(!o.qty||o.qty<=0||!o.harga_beli||o.harga_beli<=0||o.biaya_angkut<0||(o.harga_jual!=null&&o.harga_jual<=0)){toast('Jumlah dan harga beli wajib lebih besar dari nol; biaya angkut tidak boleh negatif.','error');return}
   if(o.supplier) o.supplier=o.supplier.trim().toUpperCase();
-  const {error}=await supabaseClient.from(table).insert(o);
-  if(error){toast(error.message,'error');return}
-  toast('Tersimpan');await load();draw();
+  const updating=table==='kulakan'&&st.editId!=null;
+  const response=updating
+    ? await supabaseClient.from(table).update(o).eq('id',st.editId).select('id')
+    : await supabaseClient.from(table).insert(o);
+  if(response.error){toast((updating?'Gagal memperbarui':'Gagal menyimpan')+': '+response.error.message,'error');return}
+  if(updating&&!response.data?.length){toast('Data kulakan tidak diperbarui. Baris mungkin sudah dihapus atau akses Anda berubah.','error');return}
+  st.editId=null;
+  const loaded=await load();
+  draw();
+  if(!loaded){toast('Perubahan tersimpan, tetapi daftar kulakan gagal dimuat ulang. Muat ulang halaman.','error');return}
+  toast(updating?'Perubahan kulakan berhasil disimpan.':'Barang kulakan berhasil ditambahkan.');
+}
+
+function startEdit(id){
+  if(!window.isAppOwner||!window.isAppOwner()){toast('Hanya pemilik yang dapat mengubah data.','error');return}
+  const row=st.kulakan.find(item=>String(item.id)===String(id));
+  if(!row){toast('Baris kulakan tidak ditemukan. Muat ulang data lalu coba lagi.','error');return}
+  st.editId=row.id;
+  st.sub='buku';
+  draw();
+  const form=$('kx-f');
+  if(form){form.scrollIntoView({behavior:'smooth',block:'center'});form.querySelector('[name="barang"]').focus()}
+}
+
+async function deleteKulakan(id){
+  if(!window.isAppOwner||!window.isAppOwner()){toast('Hanya pemilik yang dapat mengubah data.','error');return}
+  const row=st.kulakan.find(item=>String(item.id)===String(id));
+  if(!row){toast('Baris kulakan tidak ditemukan. Muat ulang data lalu coba lagi.','error');return}
+  if(!confirm(`Hapus "${row.barang}" dari Buku Kulakan? Tindakan ini tidak dapat dibatalkan. Arsip detail pengeluaran struk tidak ikut dihapus.`))return;
+  try{
+    const {data,error}=await supabaseClient.from('kulakan').delete().eq('id',row.id).select('id');
+    if(error)throw error;
+    if(!data?.length){toast('Baris tidak dihapus. Data mungkin sudah berubah atau akses Anda ditolak.','error');return}
+    if(String(st.editId)===String(row.id))st.editId=null;
+    const loaded=await load();
+    draw();
+    if(!loaded){toast('Baris berhasil dihapus, tetapi daftar gagal dimuat ulang. Muat ulang halaman.','error');return}
+    toast('Baris kulakan berhasil dihapus. Arsip pengeluaran tetap tersimpan.');
+  }catch(error){
+    console.error('Gagal menghapus baris kulakan:',error);
+    toast('Gagal menghapus baris kulakan: '+(error.message||'kesalahan database'),'error');
+  }
 }
 
 /* ---------- Impor dari Excel BELANJA KULAKAN ---------- */
