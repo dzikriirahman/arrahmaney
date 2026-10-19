@@ -11,6 +11,8 @@ create table if not exists public.kulakan(
   harga_jual numeric, isi_per_satuan numeric default 1,
   total_modal numeric generated always as (qty*harga_beli+coalesce(biaya_angkut,0)) stored,
   margin numeric generated always as (case when harga_jual>0 then (harga_jual-(qty*harga_beli+coalesce(biaya_angkut,0))/nullif(qty,0))/harga_jual end) stored);
+comment on column public.kulakan.margin is
+  'Margin kotor = (harga_jual per satuan - HPP per satuan) / harga_jual. Harga beli, jumlah, dan harga jual harus memakai satuan yang sama; nilai negatif berarti harga jual di bawah HPP.';
 
 alter table public.supplier_kulakan enable row level security;
 alter table public.kulakan enable row level security;

@@ -85,6 +85,13 @@
     if (email) email.focus();
   };
 
+  window.closeOwnerLogin = function () {
+    if (window.isAppOwner && window.isAppOwner()) return;
+    const screen = $('login-screen');
+    if (screen) screen.classList.add('hidden');
+    setMessage($('login-message'), '');
+  };
+
   function loadEverything() {
     if (typeof window.loadDataFromSupabase === 'function') window.loadDataFromSupabase();
     if (window.loadAdvisorData) window.loadAdvisorData();
@@ -114,8 +121,14 @@
   }
 
   window.appSignOut = async function () {
-    try { await supabaseClient.auth.signOut(); } catch (e) { console.error('signOut', e); }
-    applySession(null);
+    try {
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) throw error;
+      applySession(null);
+    } catch (e) {
+      console.error('signOut', e);
+      if (typeof window.showToast === 'function') window.showToast('Gagal keluar dari akun: ' + (e.message || 'kesalahan'), 'error');
+    }
   };
 
   window.initAuth = async function () {

@@ -77,8 +77,28 @@
 
         /* Login & keamanan */
         .auth-locked header, .auth-locked main { visibility:hidden; }
-        #login-screen { position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center; padding:16px; background:linear-gradient(135deg,#064e3b 0%,#0f766e 55%,#134e4a 100%); overflow-y:auto; }
+        #login-screen { position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center; padding:16px; background:radial-gradient(ellipse at 15% 10%,rgba(110,231,183,.22),transparent 38%),radial-gradient(ellipse at 85% 90%,rgba(20,184,166,.2),transparent 34%),linear-gradient(135deg,#052e26 0%,#065f46 52%,#134e4a 100%); overflow-y:auto; }
         #login-screen.hidden { display:none; }
+        #login-screen > div { position:relative; z-index:1; max-width:440px; }
+        #login-screen form { border:1px solid rgba(255,255,255,.7); box-shadow:0 24px 70px rgba(2,23,18,.28); }
+        #login-screen input { transition:border-color .18s ease,box-shadow .18s ease,background .18s ease; }
+        #login-screen input:focus { background:#fff; border-color:#10b981; box-shadow:0 0 0 4px rgba(16,185,129,.13); }
+        #login-submit,#recovery-submit { min-height:48px; box-shadow:0 8px 18px rgba(5,150,105,.2); }
+        #login-submit:hover,#recovery-submit:hover { transform:translateY(-1px); }
+        #login-close { min-height:44px; }
+        .app-viewer #viewer-notice:not(.hidden) { display:flex; }
+        #viewer-notice { align-items:center; gap:14px; border-color:#cfe4d9; background:linear-gradient(110deg,#effaf4,#f6fbf8); color:#285b45; box-shadow:0 2px 8px rgba(15,70,45,.04); }
+        #viewer-notice .viewer-mark { width:42px; height:42px; flex:0 0 auto; display:grid; place-items:center; border-radius:14px; color:#08734f; background:#dff3e8; }
+        #viewer-notice .viewer-copy { min-width:0; }
+        #viewer-notice .viewer-label { display:block; margin-bottom:2px; font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#16805b; }
+        .app-viewer .tab-btn[data-target="input"] { display:none !important; }
+        .app-viewer #receipt-history-list button { display:none !important; }
+        .app-viewer #m-titlebar { display:none; }
+        .app-viewer main { scroll-behavior:smooth; }
+        @media(min-width:768px) {
+          body.app-viewer #app-bar { box-shadow:0 8px 24px rgba(8,47,32,.14); }
+          body.app-viewer main { padding-top:24px; }
+        }
         .app-viewer [data-owner-only], .app-viewer #input,
         .app-viewer [data-target="input"], .app-viewer #transaction-form,
         .app-viewer #receipt-save-btn, .app-viewer #receipt-cancel-edit,
@@ -115,8 +135,11 @@
 
             <!-- Tampilan: masuk -->
             <form id="login-form" class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8" novalidate>
-                <h2 class="text-lg font-bold text-slate-900">Masuk</h2>
-                <p class="text-xs text-slate-500 mb-5">Masuk sebagai pemilik untuk mengubah data. Pengunjung dapat melihat data tanpa masuk.</p>
+                <div class="flex items-start justify-between gap-4 mb-5">
+                    <div><span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-800"><i class="fas fa-shield-alt"></i>Akses pemilik</span>
+                    <h2 class="mt-3 text-xl font-extrabold text-slate-900">Selamat datang kembali</h2>
+                    <p class="mt-1 text-xs leading-relaxed text-slate-500">Masuk untuk mengelola data dan pengaturan toko.</p></div>
+                </div>
                 <label for="login-email" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Email</label>
                 <input id="login-email" type="email" autocomplete="username" inputmode="email" required class="w-full mb-4 px-3.5 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="nama@email.com">
                 <label for="login-password" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Password</label>
@@ -127,6 +150,7 @@
                 <div class="flex justify-end mb-4"><button type="button" id="login-forgot" class="text-xs font-semibold text-emerald-700 hover:underline">Lupa password?</button></div>
                 <p id="login-message" class="hidden mb-4 rounded-xl px-3 py-2.5 text-xs font-semibold" role="alert"></p>
                 <button type="submit" id="login-submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md transition-all"><i class="fas fa-sign-in-alt mr-2"></i>Masuk</button>
+                <button type="button" id="login-close" onclick="window.closeOwnerLogin && window.closeOwnerLogin()" class="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"><i class="fas fa-arrow-left mr-2"></i>Kembali ke tampilan publik</button>
             </form>
 
             <!-- Tampilan: password baru (setelah klik tautan reset di email) -->
@@ -182,7 +206,7 @@
             </nav>
             <div id="user-box" class="flex items-center gap-2 ml-auto md:ml-0">
                 <span id="user-email" class="text-xs text-emerald-200 font-medium max-w-[180px] truncate"></span>
-                <button type="button" id="owner-login-btn" onclick="window.showOwnerLogin && showOwnerLogin()" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5" title="Masuk sebagai pemilik untuk mengedit"><i class="fas fa-sign-in-alt"></i><span>Masuk pemilik</span></button>
+                <button type="button" id="owner-login-btn" onclick="window.showOwnerLogin && showOwnerLogin()" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5" title="Masuk sebagai pemilik untuk mengedit" aria-label="Masuk sebagai pemilik"><i class="fas fa-sign-in-alt"></i><span>Masuk pemilik</span></button>
                 <button type="button" id="sign-out-btn" onclick="window.appSignOut && appSignOut()" class="hidden px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5" title="Keluar dari akun" aria-label="Keluar dari akun"><i class="fas fa-sign-out-alt"></i><span class="m-hide-label">Keluar</span></button>
             </div>
         </div>
@@ -190,7 +214,11 @@
 
     <!-- Main Content -->
     <main class="flex-grow overflow-y-auto p-3 sm:p-4 md:p-8 container mx-auto w-full max-w-full">
-        <div id="viewer-notice" class="hidden max-w-5xl mx-auto mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">Mode lihat saja. Siapa pun yang memiliki tautan ini dapat melihat data keuangan; masuk sebagai pemilik untuk mengedit.</div>
+        <div id="viewer-notice" class="hidden max-w-5xl mx-auto mb-5 rounded-2xl border px-4 py-3.5 text-xs" role="status">
+            <span class="viewer-mark"><i class="fas fa-eye"></i></span>
+            <div class="viewer-copy"><span class="viewer-label">Tampilan publik · hanya baca</span><span>Data keuangan dapat dilihat oleh siapa pun yang memiliki tautan ini. Perubahan hanya dapat dilakukan oleh pemilik.</span></div>
+            <span class="hidden sm:inline-flex ml-auto flex-shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-white/80 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800"><i class="fas fa-lock"></i>Aman dibagikan</span>
+        </div>
         <div id="m-titlebar" class="md:hidden"><h2 id="m-title">Ringkasan</h2><p id="m-subtitle"></p></div>
         <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
 
@@ -1064,8 +1092,8 @@
             }).join('');
         };
 
-        window.loadDataFromSupabase = async function() {
-            if (!supabaseClient) return;
+        window.loadDataFromSupabase = async function(options = {}) {
+            if (!supabaseClient) return false;
             try {
                 const { data, error } = await supabaseClient
                     .from('transactions')
@@ -1077,10 +1105,12 @@
                 updateDashboard();
                 renderHistoryTable();
                 renderReceiptHistory();
-                showToast("Data berhasil disinkronisasi dari Cloud!");
+                if (!options.silent) showToast("Data berhasil disinkronisasi dari Cloud!");
+                return true;
             } catch (err) {
                 console.error("Gagal memuat:", err.message);
-                showToast("Gagal mengambil data dari cloud.", "error");
+                showToast("Gagal mengambil data dari cloud: " + (err.message || 'kesalahan'), "error");
+                return false;
             }
         };
 

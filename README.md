@@ -19,6 +19,13 @@ The production target is the Cloudflare Worker named `arrahman`. The app continu
 The build copies only the browser application and icons into `dist`; SQL setup files and the original Netlify function are not published as static files. The Worker routes the existing `/.netlify/functions/gemini-receipt-ocr` URL to an owner-authenticated Cloudflare handler.
 The Worker is configured to use its `workers.dev` URL; attach a custom domain later if one is desired and available in this Cloudflare account.
 
+## Kulakan calculations and Excel import
+
+- Purchase quantity, purchase price, and selling price must use the same unit (for example, buy and sell per `dus`). Total modal is `quantity × purchase price + freight`; gross profit is `quantity × selling price − total modal`; gross margin is gross profit divided by sales value. Rows without a selling price are excluded from profit/margin totals. A negative margin is a real below-cost price unless the source row mixes units.
+- The modal-barang KPI multiplies each unit price by its quantity. Unit prices themselves are not summed.
+- Importing the `Detail Kulakan` and `Master Supplier` sheets replaces the kulakan rows and updates suppliers. It also stores one `[DETAIL_STRUK]` expense per supplier, date, and invoice in `transactions`, including product lines and freight. Re-importing the same invoice updates its existing record; expense history not present in the new file is retained.
+- The import cannot safely infer whether an existing, manually entered expense is already represented by the Excel file. Check for any such manual entries before importing to avoid counting that purchase twice in the financial ledger.
+
 ## Local verification
 
 ```sh

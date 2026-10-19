@@ -52,34 +52,46 @@ function vbars(groups,label,series,W=560){
 const hrow=(l,v,w,extra='')=>`<div class="row"><div class="l"><b>${esc(l)}</b><span>${v}</span></div><div class="bar"><i style="width:${Math.max(2,w*100)}%;${extra}"></i></div></div>`;
 
 /* ---------- analytics ---------- */
+function rowEconomics(row){
+  const qty=Number(row.qty);
+  const totalModal=Number(row.total_modal);
+  const sellingPrice=row.harga_jual==null||row.harga_jual===''?null:Number(row.harga_jual);
+  const validCost=Number.isFinite(totalModal)&&totalModal>=0;
+  const hpp=Number.isFinite(qty)&&qty>0&&validCost?totalModal/qty:null;
+  const hasSellingPrice=Number.isFinite(sellingPrice)&&sellingPrice>0&&hpp!=null;
+  const rev=hasSellingPrice?sellingPrice*qty:0;
+  const laba=hasSellingPrice?rev-totalModal:null;
+  return {...row,qty,total_modal:validCost?totalModal:0,rev,laba,hpp,margin:hasSellingPrice?laba/rev:null};
+}
 function compute(){
   let k=st.kulakan.filter(r=>(st.fk==='Semua'||r.kategori===st.fk)&&(st.fs==='Semua'||r.supplier===st.fs));
-  k=k.map(r=>({...r,rev:r.harga_jual*r.qty,laba:r.harga_jual*r.qty-r.total_modal,hpp:r.total_modal/r.qty}));
+  k=k.map(rowEconomics);
   const group=(key)=>{const m={};k.forEach(r=>m[r[key]]=(m[r[key]]||0)+Number(r.total_modal));return Object.entries(m).map(([l,v])=>({l,v})).sort((a,b)=>b.v-a.v)};
-  const tot=sum(k,r=>r.total_modal),rev=sum(k,r=>r.rev),laba=rev-tot,angkut=sum(k,r=>r.biaya_angkut);
+  const tot=sum(k,r=>r.total_modal),rev=sum(k,r=>r.rev),laba=sum(k,r=>r.laba),angkut=sum(k,r=>r.biaya_angkut);
   const bySup=group('supplier'),byKat=group('kategori');
-  const katM=byKat.map(c=>{const rr=k.filter(r=>r.kategori===c.l);const rv=sum(rr,r=>r.rev);return{l:c.l,m:rv?(rv-c.v)/rv:0,v:c.v}}).sort((a,b)=>a.m-b.m);
-  const bk=[[0,.06,'< 6%','#C2542D'],[.06,.10,'6–10%','#F2B632'],[.10,.15,'10–15%','#2F7F6B'],[.15,.25,'15–25%','#0E2A21'],[.25,9,'> 25%','#4B6A9B']].map(([a,b,l,c])=>({l,c,n:k.filter(r=>r.margin>=a&&r.margin<b).length}));
+  const katM=byKat.map(c=>{const rr=k.filter(r=>r.kategori===c.l&&r.margin!=null);const rv=sum(rr,r=>r.rev);return{l:c.l,m:rv?sum(rr,r=>r.laba)/rv:null,v:c.v}}).filter(c=>c.m!=null).sort((a,b)=>a.m-b.m);
+  const bk=[[0,.06,'< 6%','#C2542D'],[.06,.10,'6–10%','#F2B632'],[.10,.15,'10–15%','#2F7F6B'],[.15,.25,'15–25%','#0E2A21'],[.25,9,'> 25%','#4B6A9B']].map(([a,b,l,c])=>({l,c,n:k.filter(r=>r.margin!=null&&r.margin>=a&&r.margin<b).length}));
   const notaM={};k.forEach(r=>{const key=r.supplier+'|'+r.tanggal+'|'+r.no_nota;(notaM[key]=notaM[key]||{sup:r.supplier,tgl:r.tanggal,no:r.no_nota,v:0,n:0});notaM[key].v+=Number(r.total_modal);notaM[key].n++});
   const notas=Object.values(notaM).sort((a,b)=>b.v-a.v);
-  const low=k.filter(r=>r.margin<.06).sort((a,b)=>a.margin-b.margin).map(r=>{const target=Math.ceil(r.hpp/.9/500)*500;return{...r,target,gain:(target-r.harga_jual)*r.qty}});
-  const topLaba=[...k].sort((a,b)=>b.laba-a.laba).slice(0,8);
+  const low=k.filter(r=>r.margin!=null&&r.margin<.06).sort((a,b)=>a.margin-b.margin).map(r=>{const target=Math.ceil(r.hpp/.9/500)*500;return{...r,target,gain:(target-r.harga_jual)*r.qty}});
+  const topLaba=[...k].filter(r=>r.laba!=null).sort((a,b)=>b.laba-a.laba).slice(0,8);
   const topM=[...k].filter(r=>r.laba>0).sort((a,b)=>b.margin-a.margin).slice(0,6);
   // Ringkasan supplier mengikuti Excel: Total Pembelian = jumlah x harga beli (TANPA biaya angkut); angkut ditampilkan sebagai baris TRANSPORT.
   const exM={};k.forEach(r=>{const e=exM[r.supplier]=exM[r.supplier]||{l:r.supplier,n:0,v:0};e.n++;e.v+=Number(r.qty)*Number(r.harga_beli)});
   const exSup=Object.values(exM).sort((a,b)=>b.v-a.v);
   const transport={n:k.filter(r=>Number(r.biaya_angkut)>0).length,v:angkut};
   const allTot=sum(st.kulakan,r=>r.total_modal);
-  const modalBeli=sum(k,r=>r.harga_beli);
-  return{k,exSup,transport,allTot,modalBeli,tot,rev,laba,angkut,bySup,byKat,katM,bk,notas,low,topLaba,topM,barang:sum(k,r=>r.qty*r.harga_beli),mw:rev?laba/rev:0};
+  const barang=sum(k,r=>Number(r.qty)*Number(r.harga_beli));
+  const modalBeli=barang;
+  return{k,exSup,transport,allTot,modalBeli,tot,rev,laba,angkut,bySup,byKat,katM,bk,notas,low,topLaba,topM,barang,mw:rev?laba/rev:0};
 }
 
 /* ---------- widgets ---------- */
 const W=[
- {id:'k_modal',t:'TOTAL MODAL KULAKAN',s:4,r:c=>`<div class="kpi"><small>TOTAL MODAL KULAKAN</small><b style="margin:12px 0 8px">${rp(c.modalBeli)}</b><span>Jumlah kolom Harga Beli / Unit (Excel: Detail Kulakan I)</span></div>`},
+ {id:'k_modal',t:'TOTAL MODAL BARANG',s:4,r:c=>`<div class="kpi"><small>TOTAL MODAL BARANG</small><b style="margin:12px 0 8px">${rp(c.modalBeli)}</b><span>Jumlah × harga beli per unit (belum termasuk ongkos)</span></div>`},
  {id:'k_ops',t:'TOTAL BIAYA OPERASIONAL',s:4,r:c=>`<div class="kpi"><small>TOTAL BIAYA OPERASIONAL</small><b style="margin:12px 0 8px">${rp(c.angkut)}</b><span>Jumlah kolom Biaya Angkut/Lain (J)</span></div>`},
  {id:'k_out',t:'TOTAL PENGELUARAN',s:4,r:c=>`<div class="kpi"><small>TOTAL PENGELUARAN</small><b style="margin:12px 0 8px">${rp(c.tot)}</b><span>Jumlah kolom Total Modal (K) = (Jumlah × Harga Beli) + Biaya Angkut</span></div>`},
- {id:'k_laba',t:'POTENSI KEUNTUNGAN',s:4,r:c=>`<div class="kpi"><small>POTENSI KEUNTUNGAN</small><b style="margin:12px 0 8px">${rp(c.laba)}</b><span>Jumlah kolom Potensi Profit Total (R) = (Harga Jual − HPP) × Jumlah</span></div>`},
+ {id:'k_laba',t:'POTENSI KEUNTUNGAN',s:4,r:c=>`<div class="kpi"><small>POTENSI KEUNTUNGAN</small><b style="margin:12px 0 8px">${rp(c.laba)}</b><span>Laba kotor = nilai jual − total modal. Margin minus berarti harga jual di bawah HPP.</span></div>`},
  {id:'supx',t:'Ringkasan pembelian per supplier',s:6,r:c=>`<h3>Ringkasan pembelian per supplier</h3><div class="sub">Total Pembelian = Jumlah × Harga Beli (tanpa angkut). Angkut tampil di baris TRANSPORT.</div><div class="sc"><table style="min-width:360px"><thead><tr><th>Supplier / Toko</th><th class="r">Transaksi</th><th class="r">Total Pembelian</th></tr></thead><tbody>${c.exSup.map(e=>`<tr><td>${esc(tc(e.l))}</td><td class="r">${e.n}</td><td class="r">${rp(e.v)}</td></tr>`).join('')}${c.transport.v?`<tr><td>Transport</td><td class="r">${c.transport.n}</td><td class="r">${rp(c.transport.v)}</td></tr>`:''}<tr><td><b>Total</b></td><td class="r"><b>${c.exSup.reduce((a,e)=>a+e.n,0)}</b></td><td class="r"><b>${rp(c.exSup.reduce((a,e)=>a+e.v,0)+c.transport.v)}</b></td></tr></tbody></table></div>`},
  {id:'sup',x:1,t:'Pangsa supplier',s:4,r:c=>`<h3>Pangsa supplier</h3><div class="sub">Siapa yang menerima uang belanja</div>${donut([...c.bySup.slice(0,5).map(x=>({l:tc(x.l),v:x.v})),...(c.bySup.length>5?[{l:'Lainnya',v:sum(c.bySup.slice(5),x=>x.v)}]:[])],'Pangsa belanja per supplier')}`},
  {id:'kat',x:1,t:'Pangsa kategori',s:4,r:c=>`<h3>Belanja per kategori</h3><div class="sub">Sebaran modal di tiap jenis barang</div>${donut(c.byKat.map(x=>({l:x.l,v:x.v})),'Pangsa belanja per kategori')}`},
@@ -117,11 +129,11 @@ function vRingkasan(){
    <button class="ghost" id="kx-tp" aria-expanded="${st.panel}">Atur widget</button></div></div>
    <div id="kx-panel" class="${st.panel?'open':''}">${W.map(w=>`<label><input type="checkbox" data-w="${w.id}" ${st.hidden.includes(w.id)?'':'checked'} style="min-height:auto"> ${w.t}${w.x?' <span class="pill n" style="font-size:11px">Tambahan</span>':''}</label>`).join('')}</div>
    <div class="wg">${vis.map(w=>`<section class="w s${w.s}${w.dark?' dark':''}">${w.x?'<span class="pill n" style="align-self:flex-start;font-size:11px">Tambahan · bukan rumus Excel</span>':''}${w.r(c)}</section>`).join('')}</div>
-   <div style="font-size:12px;color:#4D6B5D">Rumus Excel: Total Modal = (Jumlah × Harga Beli) + Biaya Angkut; HPP = Total Modal ÷ Jumlah; Margin = (Harga Jual − HPP) ÷ Harga Jual; Potensi Profit = (Harga Jual − HPP) × Jumlah. Widget bertanda &quot;Tambahan&quot; bukan dari Excel dan disembunyikan secara bawaan (Atur widget). Filter kategori/supplier mengubah angka widget; total keuntungan selalu memakai semua data.</div>`;
+   <div style="font-size:12px;color:#4D6B5D">Rumus per satuan yang sama: total modal = (jumlah × harga beli) + ongkos; HPP/unit = total modal ÷ jumlah; laba kotor = (harga jual − HPP/unit) × jumlah; margin kotor = laba kotor ÷ nilai jual. Margin negatif berarti harga jual berada di bawah HPP, bukan otomatis kesalahan rumus—pastikan satuan harga beli, jumlah, dan harga jual konsisten. Widget bertanda &quot;Tambahan&quot; dapat diatur; angka mengikuti filter kategori/supplier.</div>`;
 }
 function vBuku(){
   const kats=['Semua',...new Set(st.kulakan.map(r=>r.kategori))];
-  const rows=st.kulakan.filter(r=>(st.kat==='Semua'||r.kategori===st.kat)&&(r.barang+r.no_nota).toLowerCase().includes(st.q.toLowerCase()));
+  const rows=st.kulakan.filter(r=>(st.kat==='Semua'||r.kategori===st.kat)&&(r.barang+r.no_nota).toLowerCase().includes(st.q.toLowerCase())).map(rowEconomics);
   return `<header><div class="eyebrow">Buku Kulakan</div><h1>Semua barang yang masuk</h1></header>
   <div class="w"><form id="kx-f">
    <label>Tanggal<input type="date" name="tanggal" required value="${new Date().toISOString().slice(0,10)}"></label>
@@ -137,9 +149,9 @@ function vBuku(){
   <div style="display:flex;flex-wrap:wrap;gap:12px"><input id="kx-q" placeholder="Cari barang atau nota" value="${esc(st.q)}" style="flex:1 1 260px" aria-label="Cari">
    <select id="kx-kat" aria-label="Kategori">${kats.map(c=>`<option ${c===st.kat?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
   <div class="w" style="padding:0;overflow:hidden"><div class="sc"><table style="min-width:1300px"><thead><tr><th>Tanggal</th><th>No. Nota</th><th>Kategori</th><th>Supplier</th><th>Nama Barang</th><th class="r">Jumlah</th><th>Satuan</th><th class="r">Harga Beli/Unit</th><th class="r">Biaya Angkut</th><th class="r">Total Modal</th><th class="r">HPP/Unit</th><th class="r">Harga Jual/Unit</th><th class="r">Margin (%)</th><th class="r">Potensi Profit</th></tr></thead><tbody>
-   ${rows.map(r=>{const hpp=r.total_modal/r.qty;return `<tr><td>${tgl(r.tanggal)}</td><td>${esc(r.no_nota)}</td><td>${esc(r.kategori)}</td><td>${esc(tc(r.supplier))}</td><td><b>${esc(r.barang)}</b></td><td class="r">${r.qty}</td><td>${esc(r.satuan)}</td><td class="r">${rp(r.harga_beli)}</td><td class="r">${r.biaya_angkut?rp(r.biaya_angkut):'—'}</td><td class="r"><b>${rp(r.total_modal)}</b></td><td class="r">${rp(hpp)}</td><td class="r">${r.harga_jual==null?'—':rp(r.harga_jual)}</td><td class="r">${r.margin==null?'—':pct(r.margin,2)}</td><td class="r">${r.harga_jual==null?'—':rp((r.harga_jual-hpp)*r.qty)}</td></tr>`}).join('')}
-   <tr style="font-weight:700;background:#F6F8F5"><td colspan="5">TOTAL</td><td class="r">${sum(rows,r=>r.qty)}</td><td></td><td class="r">${rp(sum(rows,r=>r.harga_beli))}</td><td class="r">${rp(sum(rows,r=>r.biaya_angkut))}</td><td class="r">${rp(sum(rows,r=>r.total_modal))}</td><td colspan="3"></td><td class="r">${rp(sum(rows,r=>r.harga_jual==null?0:(r.harga_jual-r.total_modal/r.qty)*r.qty))}</td></tr>
-  </tbody></table></div><div style="padding:16px;font-size:13px;color:var(--mut)">${rows.length} baris. Baris TOTAL mengikuti baris TOTAL di Excel (Jumlah, Harga Beli/Unit, Biaya Angkut, Total Modal, Potensi Profit).</div></div>`;
+  ${rows.map(r=>`<tr><td>${tgl(r.tanggal)}</td><td>${esc(r.no_nota)}</td><td>${esc(r.kategori)}</td><td>${esc(tc(r.supplier))}</td><td><b>${esc(r.barang)}</b></td><td class="r">${r.qty}</td><td>${esc(r.satuan)}</td><td class="r">${rp(r.harga_beli)}</td><td class="r">${r.biaya_angkut?rp(r.biaya_angkut):'—'}</td><td class="r"><b>${rp(r.total_modal)}</b></td><td class="r">${r.hpp==null?'—':rp(r.hpp)}</td><td class="r">${r.harga_jual==null?'—':rp(r.harga_jual)}</td><td class="r">${r.margin==null?'—':pct(r.margin,2)}</td><td class="r">${r.laba==null?'—':rp(r.laba)}</td></tr>`).join('')}
+  <tr style="font-weight:700;background:#F6F8F5"><td colspan="5">TOTAL</td><td class="r">${sum(rows,r=>r.qty)}</td><td></td><td class="r" title="Harga satuan tidak dijumlahkan">—</td><td class="r">${rp(sum(rows,r=>r.biaya_angkut))}</td><td class="r">${rp(sum(rows,r=>r.total_modal))}</td><td colspan="3"></td><td class="r">${rp(sum(rows,r=>r.laba))}</td></tr>
+  </tbody></table></div><div style="padding:16px;font-size:13px;color:var(--mut)">${rows.length} baris. Harga beli/unit tidak dijumlahkan karena merupakan harga satuan; total modal sudah menghitung jumlah × harga beli ditambah ongkos.</div></div>`;
 }
 function vSupplier(){
   return `<header><div class="eyebrow">Supplier</div><h1>Pemasok</h1></header>
@@ -157,7 +169,7 @@ function draw(){
   const empty=st.loaded&&!st.kulakan.length&&!st.error?'<div class="w">Belum ada data kulakan. Klik <b>Impor Excel</b> (file BELANJA KULAKAN) atau tambah lewat Buku Kulakan.</div>':'';
   r.innerHTML=head+empty+body;
   r.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{st.sub=b.dataset.sub;draw()});
-  $('kx-file').onchange=e=>importExcel(e.target.files[0]);
+  $('kx-file').onchange=e=>{const input=e.currentTarget;importExcel(input.files[0]).finally(()=>{input.value=''});};
   if($('kx-q')){ $('kx-q').oninput=e=>{st.q=e.target.value;const p=e.target.selectionStart;draw();const n=$('kx-q');n.focus();n.setSelectionRange(p,p)}; $('kx-kat').onchange=e=>{st.kat=e.target.value;draw()}; }
   if($('kx-f')) $('kx-f').onsubmit=e=>save(e,'kulakan');
   if($('kx-fk')){ $('kx-fk').onchange=e=>{st.fk=e.target.value;draw()}; $('kx-fs').onchange=e=>{st.fs=e.target.value;draw()};
@@ -179,26 +191,67 @@ async function save(e,table){
 const ALIAS={'SALES BOWO':'GUDANG GARAM','PLASTIK PASAR JTB':'TOKO PLASTIK','SALES PANDEMAS':'PANDEMAS'};
 function ymd(serial){const d=XLSX.SSF.parse_date_code(serial);return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`}
 function sheetRows(wb,name){const ws=wb.Sheets[name];return ws?XLSX.utils.sheet_to_json(ws,{header:1,range:'A1:T400',defval:null}):[]}
+async function makeReceiptTransactions(rows){
+  const groups=new Map();
+  rows.forEach(row=>{
+    const key=JSON.stringify([row.tanggal,row.supplier.trim().toLowerCase(),row.no_nota.trim()]);
+    if(!groups.has(key))groups.set(key,{key,date:row.tanggal,invoice:row.no_nota,supplier:row.supplier,rows:[]});
+    groups.get(key).rows.push(row);
+  });
+  const receipts=[];
+  for(const group of groups.values()){
+    const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(group.key));
+    const sourceKey=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+    const id='KULAKAN-'+sourceKey;
+    const old=typeof transactions==='undefined'?null:transactions.find(row=>String(row.id)===id);
+    const goods=group.rows.map(row=>{
+      const qty=Number(row.qty),unitPrice=Number(row.harga_beli);
+      return{name:String(row.barang),qty,unit:row.satuan||'unit',unitPrice,amount:Math.round(qty*unitPrice),needsReview:false,reviewFlags:[],rawLine:'Impor Excel Kulakan'};
+    });
+    const freight=Math.round(group.rows.reduce((total,row)=>total+Number(row.biaya_angkut||0),0));
+    if(freight>0)goods.push({name:'Biaya angkut/lain-lain',qty:1,unit:'biaya',unitPrice:freight,amount:freight,needsReview:false,reviewFlags:[],rawLine:'Impor Excel Kulakan'});
+    const total=goods.reduce((amount,item)=>amount+Number(item.amount||0),0);
+    const detail={type:'receipt_expense_v1',invoice:group.invoice==='-'?'':group.invoice,supplier:group.supplier,items:goods,source:'kulakan_excel_import_v1',sourceKey,savedAt:new Date().toISOString()};
+    receipts.push({id,jenis:'pengeluaran',tanggal:group.date,kategori:'Pembelian Barang (Kulakan Stok)',nominal:total,keterangan:'[DETAIL_STRUK] '+JSON.stringify(detail),timestamp:old&&old.timestamp||new Date().toISOString()});
+  }
+  return receipts;
+}
 async function importExcel(file){
   if(!window.isAppOwner||!window.isAppOwner()){toast('Hanya pemilik yang dapat mengubah data.','error');return}
   if(!file) return;
+  let kulakanCleared=false,kulakanSaved=false;
   try{
     const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
-    let kul=sheetRows(wb,'Detail Kulakan').filter(r=>typeof r[0]==='number'&&typeof r[1]==='number'&&r[5]).map(r=>({tanggal:ymd(r[1]),no_nota:String(r[2]??'-'),kategori:r[3],supplier:ALIAS[String(r[4]).trim().toUpperCase()]||String(r[4]).trim().toUpperCase(),barang:r[5],qty:r[6],satuan:r[7],harga_beli:r[8],biaya_angkut:r[9]||0,harga_jual:r[12],isi_per_satuan:r[13]}));
-    const sup=sheetRows(wb,'Master Supplier').filter(r=>typeof r[1]==='number'&&r[2]).map(r=>({nama:String(r[2]).trim().toUpperCase(),kategori:r[3],kontak:r[4],telp:r[5]?String(r[5]):null,lokasi:r[6],pembayaran:r[7]}));
+    const detailRows=sheetRows(wb,'Detail Kulakan').filter(r=>r[5]&&String(r[0]).toLowerCase()!=='no');
+    const invalidRows=detailRows.filter(r=>typeof r[1]!=='number'||!Number.isFinite(Number(r[6]))||Number(r[6])<=0||!Number.isFinite(Number(r[8]))||Number(r[8])<=0||!String(r[4]||'').trim()||(r[9]!=null&&(!Number.isFinite(Number(r[9]))||Number(r[9])<0))||(r[12]!=null&&!Number.isFinite(Number(r[12]))));
+    if(invalidRows.length)return toast(`Impor dibatalkan: ${invalidRows.length} baris memiliki tanggal, supplier, jumlah, atau harga yang tidak valid. Periksa sheet "Detail Kulakan".`,'error');
+    let kul=detailRows.map(r=>({tanggal:ymd(r[1]),no_nota:String(r[2]??'-').trim()||'-',kategori:String(r[3]||'').trim(),supplier:ALIAS[String(r[4]).trim().toUpperCase()]||String(r[4]).trim().toUpperCase(),barang:String(r[5]).trim(),qty:Number(r[6]),satuan:String(r[7]||'unit').trim(),harga_beli:Number(r[8]),biaya_angkut:r[9]==null?0:Number(r[9]),harga_jual:r[12]==null?null:Number(r[12]),isi_per_satuan:Number(r[13])>0?Number(r[13]):1}));
+    const supplierRows=sheetRows(wb,'Master Supplier').filter(r=>typeof r[1]==='number'&&r[2]).map(r=>({nama:String(r[2]).trim().toUpperCase(),kategori:r[3],kontak:r[4],telp:r[5]?String(r[5]):null,lokasi:r[6],pembayaran:r[7]}));
     if(!kul.length) return toast('Sheet "Detail Kulakan" tidak berisi data.','error');
+    const supplierByName=new Map(supplierRows.map(s=>[s.nama,s]));
+    const sup=[...supplierByName.values()];
     // supplier yang belum ada di master ikut dibuat
     const have=new Set(sup.map(s=>s.nama));
     [...new Set(kul.map(r=>r.supplier))].filter(n=>!have.has(n)).forEach(n=>sup.push({nama:n,kategori:[...new Set(kul.filter(r=>r.supplier===n).map(r=>r.kategori))].join(', ').toUpperCase(),kontak:null,telp:null,lokasi:null,pembayaran:null}));
     // Tanggal nota di Excel lebih maju dari bulan ini (typo)? tawarkan koreksi, boleh ditolak
     const mkK=kul.map(r=>r.tanggal).sort().pop()?.slice(0,7), now=new Date().toISOString().slice(0,7);
     if(mkK&&mkK>now&&confirm(`Tanggal nota di Excel tertulis bulan ${mkK}, lebih maju dari bulan ini (${now}). Ubah ke bulan ${now}? Pilih Batal untuk memakai tanggal persis seperti di Excel.`)) kul=kul.map(r=>({...r,tanggal:now+r.tanggal.slice(7)}));
-    if(!confirm(`Impor ${kul.length} baris kulakan dan ${sup.length} supplier?`+(st.kulakan.length?`\n\nTabel kulakan sudah berisi ${st.kulakan.length} baris dan akan DIGANTI.`:''))) return;
-    if(st.kulakan.length){const d=await supabaseClient.from('kulakan').delete().gt('id',0);if(d.error)throw d.error}
+    const receipts=await makeReceiptTransactions(kul);
+    if(!confirm(`Impor ${kul.length} baris kulakan, ${sup.length} supplier, dan ${receipts.length} nota ke Detail Pengeluaran? Nota yang sama akan diperbarui, bukan digandakan.`+(st.kulakan.length?`\n\nTabel kulakan berisi ${st.kulakan.length} baris dan akan DIGANTI. Arsip pengeluaran lain tidak dihapus.`:''))) return;
     let r1=await supabaseClient.from('supplier_kulakan').upsert(sup,{onConflict:'nama'});if(r1.error)throw r1.error;
+    if(st.kulakan.length){const d=await supabaseClient.from('kulakan').delete().gt('id',0);if(d.error)throw d.error;kulakanCleared=true}
     r1=await supabaseClient.from('kulakan').insert(kul);if(r1.error)throw r1.error;
-    toast('Impor selesai');await load();draw();
-  }catch(err){toast('Impor gagal: '+(err.message||err),'error')}
+    kulakanSaved=true;
+    r1=await supabaseClient.from('transactions').upsert(receipts,{onConflict:'id'});if(r1.error)throw r1.error;
+    const historyLoaded=await window.loadDataFromSupabase({silent:true});
+    await load();draw();
+    if(!historyLoaded){toast('Impor tersimpan, tetapi daftar pengeluaran belum diperbarui di layar. Muat ulang halaman untuk melihat hasilnya.','error');return}
+    toast(`Impor selesai: ${kul.length} barang dan ${receipts.length} nota pengeluaran tersimpan.`);
+  }catch(err){
+    console.error('Impor Excel Kulakan gagal:',err);
+    const partial=kulakanSaved?'Data kulakan berhasil diperbarui, tetapi arsip struk gagal disimpan.':kulakanCleared?'Data kulakan lama sudah dihapus, tetapi data baru belum dipastikan tersimpan.':'Impor gagal.';
+    toast(partial+' '+(err.message||err),'error');
+  }
 }
 
 /* ---------- pasang ke sistem tab aplikasi ---------- */
