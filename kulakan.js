@@ -307,13 +307,8 @@ async function importExcel(file){
     if(invalidRows.length)return toast(`Impor dibatalkan: ${invalidRows.length} baris memiliki tanggal, supplier, jumlah, atau harga yang tidak valid. Periksa sheet "Detail Kulakan".`,'error');
     let kul=detailRows.map(r=>{
       const qty=Number(r[6]), hargaBeli=Number(r[8]), pcsKg=r[13];
-      // Logika Kolom N (PCS/KG): Jika bukan PCS, RT, RTG, atau KG, maka nilai Kolom N adalah pengali Total Modal
       const isStandardUnit=[ 'PCS', 'RT', 'RTG', 'KG', 'SLOF', 'SLOP' ].includes(String(pcsKg).toUpperCase());
       const multiplier = (isStandardUnit || !Number.isFinite(Number(pcsKg))) ? 1 : Number(pcsKg);
-      
-      // Total Modal = (Nilai Kolom N x Qty) x Harga Beli (jika N bukan satuan standar)
-      // Namun sesuai instruksi user: Total Modal = (jumlah kolom PCS/KG) x (harga beli)
-      // Jika Kolom N adalah pengali, maka harga_beli di excel dianggap harga per unit terkecil
       const finalHargaBeli = hargaBeli;
       const finalQty = (isStandardUnit || !Number.isFinite(Number(pcsKg))) ? qty : qty * multiplier;
 
@@ -335,19 +330,19 @@ async function importExcel(file){
     if(!kul.length) return toast('Sheet "Detail Kulakan" tidak berisi data.','error');
     const supplierByName=new Map(supplierRows.map(s=>[s.nama,s]));
     const sup=[...supplierByName.values()];
-    // supplier yang belum ada di master ikut dibuat
     const have=new Set(sup.map(s=>s.nama));
     [...new Set(kul.map(r=>r.supplier))].filter(n=>!have.has(n)).forEach(n=>sup.push({nama:n,kategori:[...new Set(kul.filter(r=>r.supplier===n).map(r=>r.kategori))].join(', ').toUpperCase(),kontak:null,telp:null,lokasi:null,pembayaran:null}));
-    // Tanggal nota di Excel lebih maju dari bulan ini (typo)? tawarkan koreksi, boleh ditolak
     const mkK=kul.map(r=>r.tanggal).sort().pop()?.slice(0,7), now=new Date().toISOString().slice(0,7);
     if(mkK&&mkK>now&&confirm(`Tanggal nota di Excel tertulis bulan ${mkK}, lebih maju dari bulan ini (${now}). Ubah ke bulan ${now}? Pilih Batal untuk memakai tanggal persis seperti di Excel.`)) kul=kul.map(r=>({...r,tanggal:now+r.tanggal.slice(7)}));
     const receipts=await makeReceiptTransactions(kul);
-    if(!confirm(`Impor ${kul.length} baris kulakan, ${sup.length} supplier, dan ${receipts.length} nota ke Detail Pengeluaran? Nota yang sama akan diperbarui, bukan digandakan.`+(st.kulakan.length?`\n\nTabel kulakan berisi ${st.kulakan.length} baris dan akan DIGANTI. Arsip pengeluaran lain tidak dihapus.`:''))) return;
+    if(!confirm(`Impor ${kul.length} baris kulakan, ${sup.length} supplier, dan ${receipts.length} nota ke Detail Pengeluaran? Nota yang sama akan diperbarui, bukan digandakan.\n\nPERINGATAN: Data Kulakan dan Transaksi Import lama akan DIHAPUS TOTAL (Reset) untuk mencegah data double.`)) return;
     let r1=await supabaseClient.from('supplier_kulakan').upsert(sup,{onConflict:'nama'});if(r1.error)throw r1.error;
+    // RESET TOTAL: Hapus tabel kulakan DAN transaksi import lama
     if(st.kulakan.length){const d=await supabaseClient.from('kulakan').delete().gt('id',0);if(d.error)throw d.error;kulakanCleared=true}
+    const tDel=await supabaseClient.from('transactions').delete().eq('source','kulakan_excel_import_v1');if(tDel.error)throw tDel.error;
     r1=await supabaseClient.from('kulakan').insert(kul);if(r1.error)throw r1.error;
     kulakanSaved=true;
-    r1=await supabaseClient.from('transactions').upsert(receipts,{onConflict:'id'});if(r1.error)throw r1.error;
+    r1=await supabaseClient.from('transactions').insert(receipts);if(r1.error)throw r1.error;
     const historyLoaded=await window.loadDataFromSupabase({silent:true});
     await load();draw();
     if(!historyLoaded){toast('Impor tersimpan, tetapi daftar pengeluaran belum diperbarui di layar. Muat ulang halaman untuk melihat hasilnya.','error');return}
