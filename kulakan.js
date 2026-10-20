@@ -310,7 +310,7 @@ async function importExcel(file){
       const qty=Number(r[6]), hargaBeli=Number(r[8]), pcsKg=r[13];
       // Logika Kolom N (PCS/KG): Jika bukan PCS, RT, RTG, atau KG, maka nilai Kolom N adalah pengali Total Modal
       const isStandardUnit=[ 'PCS', 'RT', 'RTG', 'KG' ].includes(String(pcsKg).toUpperCase());
-      const multiplier = (isStandardUnit || !Number.isFinite(num(pcsKg))) ? 1 : Number(pcsKg);
+      const multiplier = (isStandardUnit || !Number.isFinite(Number(pcsKg))) ? 1 : Number(pcsKg);
       
       // Total Modal = (Nilai Kolom N x Qty) x Harga Beli (jika N bukan satuan standar)
       // Namun sesuai instruksi user: Total Modal = (jumlah kolom PCS/KG) x (harga beli)
