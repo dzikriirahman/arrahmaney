@@ -54,14 +54,18 @@ const hrow=(l,v,w,extra='')=>`<div class="row"><div class="l"><b>${esc(l)}</b><s
 /* ---------- analytics ---------- */
 function rowEconomics(row){
   const qty=Number(row.qty);
-  const totalModal=Number(row.total_modal);
+  const hargaBeli=Number(row.harga_beli);
   const sellingPrice=row.harga_jual==null||row.harga_jual===''?null:Number(row.harga_jual);
-  const validCost=Number.isFinite(totalModal)&&totalModal>=0;
-  const hpp=Number.isFinite(qty)&&qty>0&&validCost?totalModal/qty:null;
-  const hasSellingPrice=Number.isFinite(sellingPrice)&&sellingPrice>0&&hpp!=null;
-  const rev=hasSellingPrice?sellingPrice*qty:0;
-  const laba=hasSellingPrice?rev-totalModal:null;
-  return {...row,qty,total_modal:validCost?totalModal:0,rev,laba,hpp,margin:hasSellingPrice?laba/rev:null};
+  const satuan=String(row.satuan||'').toLowerCase();
+  
+  const totalModal=Number.isFinite(qty)&&qty>0&&Number.isFinite(hargaBeli)&&hargaBeli>0 ? qty * hargaBeli : 0;
+  const hpp=qty>1 && totalModal>0 ? totalModal/qty : hargaBeli;
+  
+  const hasSellingPrice=Number.isFinite(sellingPrice)&&sellingPrice>0;
+  const rev=hasSellingPrice ? (qty * sellingPrice) : 0;
+  const laba=hasSellingPrice ? rev - totalModal : null;
+  
+  return {...row,qty,total_modal:totalModal,rev,laba,hpp,margin:hasSellingPrice && rev>0 ? laba/rev : null};
 }
 function compute(){
   let k=st.kulakan.filter(r=>(st.fk==='Semua'||r.kategori===st.fk)&&(st.fs==='Semua'||r.supplier===st.fs));
@@ -76,7 +80,6 @@ function compute(){
   const low=k.filter(r=>r.margin!=null&&r.margin<.06).sort((a,b)=>a.margin-b.margin).map(r=>{const target=Math.ceil(r.hpp/.9/500)*500;return{...r,target,gain:(target-r.harga_jual)*r.qty}});
   const topLaba=[...k].filter(r=>r.laba!=null).sort((a,b)=>b.laba-a.laba).slice(0,8);
   const topM=[...k].filter(r=>r.laba>0).sort((a,b)=>b.margin-a.margin).slice(0,6);
-  // Ringkasan supplier mengikuti Excel: Total Pembelian = jumlah x harga beli (TANPA biaya angkut); angkut ditampilkan sebagai baris TRANSPORT.
   const exM={};k.forEach(r=>{const e=exM[r.supplier]=exM[r.supplier]||{l:r.supplier,n:0,v:0};e.n++;e.v+=Number(r.qty)*Number(r.harga_beli)});
   const exSup=Object.values(exM).sort((a,b)=>b.v-a.v);
   const transport={n:k.filter(r=>Number(r.biaya_angkut)>0).length,v:angkut};
@@ -90,7 +93,7 @@ function compute(){
 const W=[
  {id:'k_modal',t:'TOTAL MODAL BARANG',s:4,r:c=>`<div class="kpi"><small>TOTAL MODAL BARANG</small><b style="margin:12px 0 8px">${rp(c.modalBeli)}</b><span>Jumlah × harga beli per unit (belum termasuk ongkos)</span></div>`},
  {id:'k_ops',t:'TOTAL BIAYA OPERASIONAL',s:4,r:c=>`<div class="kpi"><small>TOTAL BIAYA OPERASIONAL</small><b style="margin:12px 0 8px">${rp(c.angkut)}</b><span>Jumlah kolom Biaya Angkut/Lain (J)</span></div>`},
- {id:'k_out',t:'TOTAL PENGELUARAN',s:4,r:c=>`<div class="kpi"><small>TOTAL PENGELUARAN</small><b style="margin:12px 0 8px">${rp(c.tot)}</b><span>Jumlah kolom Total Modal (K) = (Jumlah × Harga Beli) + Biaya Angkut</span></div>`},
+ {id:'k_out',t:'TOTAL PENGELUARAN',s:4,r:c=>`<div class="kpi"><small>TOTAL PENGELUARAN</small><b style="margin:12px 0 8px">${rp(c.tot)}</b><span>Total Modal Barang + Biaya Transport Harian</span></div>`},
  {id:'k_laba',t:'POTENSI KEUNTUNGAN',s:4,r:c=>`<div class="kpi"><small>POTENSI KEUNTUNGAN</small><b style="margin:12px 0 8px">${rp(c.laba)}</b><span>Laba kotor = nilai jual − total modal. Margin minus berarti harga jual di bawah HPP.</span></div>`},
  {id:'supx',t:'Ringkasan pembelian per supplier',s:6,r:c=>`<h3>Ringkasan pembelian per supplier</h3><div class="sub">Total Pembelian = Jumlah × Harga Beli (tanpa angkut). Angkut tampil di baris TRANSPORT.</div><div class="sc"><table style="min-width:360px"><thead><tr><th>Supplier / Toko</th><th class="r">Transaksi</th><th class="r">Total Pembelian</th></tr></thead><tbody>${c.exSup.map(e=>`<tr><td>${esc(tc(e.l))}</td><td class="r">${e.n}</td><td class="r">${rp(e.v)}</td></tr>`).join('')}${c.transport.v?`<tr><td>Transport</td><td class="r">${c.transport.n}</td><td class="r">${rp(c.transport.v)}</td></tr>`:''}<tr><td><b>Total</b></td><td class="r"><b>${c.exSup.reduce((a,e)=>a+e.n,0)}</b></td><td class="r"><b>${rp(c.exSup.reduce((a,e)=>a+e.v,0)+c.transport.v)}</b></td></tr></tbody></table></div>`},
  {id:'sup',x:1,t:'Pangsa supplier',s:4,r:c=>`<h3>Pangsa supplier</h3><div class="sub">Siapa yang menerima uang belanja</div>${donut([...c.bySup.slice(0,5).map(x=>({l:tc(x.l),v:x.v})),...(c.bySup.length>5?[{l:'Lainnya',v:sum(c.bySup.slice(5),x=>x.v)}]:[])],'Pangsa belanja per supplier')}`},
@@ -129,7 +132,7 @@ function vRingkasan(){
    <button class="ghost" id="kx-tp" aria-expanded="${st.panel}">Atur widget</button></div></div>
    <div id="kx-panel" class="${st.panel?'open':''}">${W.map(w=>`<label><input type="checkbox" data-w="${w.id}" ${st.hidden.includes(w.id)?'':'checked'} style="min-height:auto"> ${w.t}${w.x?' <span class="pill n" style="font-size:11px">Tambahan</span>':''}</label>`).join('')}</div>
    <div class="wg">${vis.map(w=>`<section class="w s${w.s}${w.dark?' dark':''}">${w.x?'<span class="pill n" style="align-self:flex-start;font-size:11px">Tambahan · bukan rumus Excel</span>':''}${w.r(c)}</section>`).join('')}</div>
-   <div style="font-size:12px;color:#4D6B5D">Rumus per satuan yang sama: total modal = (jumlah × harga beli) + ongkos; HPP/unit = total modal ÷ jumlah; laba kotor = (harga jual − HPP/unit) × jumlah; margin kotor = laba kotor ÷ nilai jual. Margin negatif berarti harga jual berada di bawah HPP, bukan otomatis kesalahan rumus—pastikan satuan harga beli, jumlah, dan harga jual konsisten. Widget bertanda &quot;Tambahan&quot; dapat diatur; angka mengikuti filter kategori/supplier.</div>`;
+   <div style="font-size:12px;color:#4D6B5D">Rumus: total modal = jumlah × harga beli; HPP/unit = total modal ÷ jumlah (jika jumlah > 1); laba kotor = (harga jual − HPP/unit) × jumlah; margin kotor = laba kotor ÷ nilai jual. Ongkos transport diinput manual melalui Pengeluaran Pilihan Transport. Margin negatif berarti harga jual di bawah HPP. Widget bertanda &quot;Tambahan&quot; dapat diatur; angka mengikuti filter kategori/supplier.</div>`;
 }
 function kulakanForm(editing,id){
   return `<form id="${id}">
