@@ -58,14 +58,22 @@ function rowEconomics(row){
   const sellingPrice=row.harga_jual==null||row.harga_jual===''?null:Number(row.harga_jual);
   const satuan=String(row.satuan||'').toLowerCase();
   
+  // Total Modal = Jumlah (PCS/KG) x Harga Beli
   const totalModal=Number.isFinite(qty)&&qty>0&&Number.isFinite(hargaBeli)&&hargaBeli>0 ? qty * hargaBeli : 0;
+  
+  // HPP per unit = total modal / jumlah (jika jumlah > 1), jika tidak maka harga beli itu sendiri
   const hpp=qty>1 && totalModal>0 ? totalModal/qty : hargaBeli;
   
   const hasSellingPrice=Number.isFinite(sellingPrice)&&sellingPrice>0;
   const rev=hasSellingPrice ? (qty * sellingPrice) : 0;
-  const laba=hasSellingPrice ? rev - totalModal : null;
   
-  return {...row,qty,total_modal:totalModal,rev,laba,hpp,margin:hasSellingPrice && rev>0 ? laba/rev : null};
+  // Laba kotor = (harga jual per unit - HPP per unit) x jumlah
+  const laba=hasSellingPrice ? (sellingPrice - hpp) * qty : null;
+  
+  // Margin = laba kotor / (harga jual per unit x jumlah)
+  const margin=hasSellingPrice && rev>0 ? laba/rev : null;
+  
+  return {...row,qty,total_modal:totalModal,rev,laba,hpp,margin};
 }
 function compute(){
   let k=st.kulakan.filter(r=>(st.fk==='Semua'||r.kategori===st.fk)&&(st.fs==='Semua'||r.supplier===st.fs));
