@@ -335,11 +335,15 @@ async function importExcel(file){
     const mkK=kul.map(r=>r.tanggal).sort().pop()?.slice(0,7), now=new Date().toISOString().slice(0,7);
     if(mkK&&mkK>now&&confirm(`Tanggal nota di Excel tertulis bulan ${mkK}, lebih maju dari bulan ini (${now}). Ubah ke bulan ${now}? Pilih Batal untuk memakai tanggal persis seperti di Excel.`)) kul=kul.map(r=>({...r,tanggal:now+r.tanggal.slice(7)}));
     const receipts=await makeReceiptTransactions(kul);
-    if(!confirm(`Impor ${kul.length} baris kulakan, ${sup.length} supplier, dan ${receipts.length} nota ke Detail Pengeluaran? Nota yang sama akan diperbarui, bukan digandakan.\n\nPERINGATAN: Data Kulakan dan Transaksi Import lama akan DIHAPUS TOTAL (Reset) untuk mencegah data double.`)) return;
+    if(!confirm(`Impor ${kul.length} baris kulakan, ${sup.length} supplier, dan ${receipts.length} nota ke Detail Pengeluaran? Nota yang sama akan diperbarui, bukan digandakan.\n\nPERINGATAN: Data Kulakan dan Transaksi lama akan DIHAPUS TOTAL (Reset) untuk mencegah data double.`)) return;
     let r1=await supabaseClient.from('supplier_kulakan').upsert(sup,{onConflict:'nama'});if(r1.error)throw r1.error;
-    // RESET TOTAL: Hapus tabel kulakan DAN transaksi import lama
+    // RESET TOTAL: Hapus tabel kulakan
     if(st.kulakan.length){const d=await supabaseClient.from('kulakan').delete().gt('id',0);if(d.error)throw d.error;kulakanCleared=true}
-    const tDel=await supabaseClient.from('transactions').delete().eq('source','kulakan_excel_import_v1');if(tDel.error)throw tDel.error;
+    
+    // Hapus transaksi berdasarkan daftar no_nota dari Excel agar tidak double
+    const notas=kul.map(r=>r.no_nota).filter(n=>n!=='-');
+    if(notas.length){const tDel=await supabaseClient.from('transactions').delete().in('no_nota',notas);if(tDel.error)throw tDel.error}
+    
     r1=await supabaseClient.from('kulakan').insert(kul);if(r1.error)throw r1.error;
     kulakanSaved=true;
     r1=await supabaseClient.from('transactions').insert(receipts);if(r1.error)throw r1.error;
