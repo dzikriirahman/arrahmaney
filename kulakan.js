@@ -316,7 +316,7 @@ async function importExcel(file){
       // Namun sesuai instruksi user: Total Modal = (jumlah kolom PCS/KG) x (harga beli)
       // Jika Kolom N adalah pengali, maka harga_beli di excel dianggap harga per unit terkecil
       const finalHargaBeli = hargaBeli;
-      const finalQty = (isStandardUnit || !Number.isFinite(num(pcsKg))) ? qty : qty * multiplier;
+      const finalQty = (isStandardUnit || !Number.isFinite(Number(pcsKg))) ? qty : qty * multiplier;
 
       return {
         tanggal:ymd(r[1]),
