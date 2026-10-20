@@ -306,7 +306,32 @@ async function importExcel(file){
     const detailRows=sheetRows(wb,'Detail Kulakan').filter(r=>r[5]&&String(r[0]).toLowerCase()!=='no');
     const invalidRows=detailRows.filter(r=>typeof r[1]!=='number'||!Number.isFinite(Number(r[6]))||Number(r[6])<=0||!Number.isFinite(Number(r[8]))||Number(r[8])<=0||!String(r[4]||'').trim()||(r[9]!=null&&(!Number.isFinite(Number(r[9]))||Number(r[9])<0))||(r[12]!=null&&!Number.isFinite(Number(r[12]))));
     if(invalidRows.length)return toast(`Impor dibatalkan: ${invalidRows.length} baris memiliki tanggal, supplier, jumlah, atau harga yang tidak valid. Periksa sheet "Detail Kulakan".`,'error');
-    let kul=detailRows.map(r=>({tanggal:ymd(r[1]),no_nota:String(r[2]??'-').trim()||'-',kategori:String(r[3]||'').trim(),supplier:ALIAS[String(r[4]).trim().toUpperCase()]||String(r[4]).trim().toUpperCase(),barang:String(r[5]).trim(),qty:Number(r[6]),satuan:String(r[7]||'unit').trim(),harga_beli:Number(r[8]),biaya_angkut:r[9]==null?0:Number(r[9]),harga_jual:r[12]==null?null:Number(r[12]),isi_per_satuan:Number(r[13])>0?Number(r[13]):1}));
+    let kul=detailRows.map(r=>{
+      const qty=Number(r[6]), hargaBeli=Number(r[8]), pcsKg=r[13];
+      // Logika Kolom N (PCS/KG): Jika bukan PCS, RT, RTG, atau KG, maka nilai Kolom N adalah pengali Total Modal
+      const isStandardUnit=[ 'PCS', 'RT', 'RTG', 'KG' ].includes(String(pcsKg).toUpperCase());
+      const multiplier = (isStandardUnit || !Number.isFinite(num(pcsKg))) ? 1 : Number(pcsKg);
+      
+      // Total Modal = (Nilai Kolom N x Qty) x Harga Beli (jika N bukan satuan standar)
+      // Namun sesuai instruksi user: Total Modal = (jumlah kolom PCS/KG) x (harga beli)
+      // Jika Kolom N adalah pengali, maka harga_beli di excel dianggap harga per unit terkecil
+      const finalHargaBeli = hargaBeli;
+      const finalQty = (isStandardUnit || !Number.isFinite(num(pcsKg))) ? qty : qty * multiplier;
+
+      return {
+        tanggal:ymd(r[1]),
+        no_nota:String(r[2]??'-').trim()||'-',
+        kategori:String(r[3]||'').trim(),
+        supplier:ALIAS[String(r[4]).trim().toUpperCase()]||String(r[4]).trim().toUpperCase(),
+        barang:String(r[5]).trim(),
+        qty: finalQty,
+        satuan:String(r[7]||'unit').trim(),
+        harga_beli: finalHargaBeli,
+        biaya_angkut:r[9]==null?0:Number(r[9]),
+        harga_jual:r[12]==null?null:Number(r[12]),
+        isi_per_satuan: multiplier > 0 ? multiplier : 1
+      };
+    });
     const supplierRows=sheetRows(wb,'Master Supplier').filter(r=>typeof r[1]==='number'&&r[2]).map(r=>({nama:String(r[2]).trim().toUpperCase(),kategori:r[3],kontak:r[4],telp:r[5]?String(r[5]):null,lokasi:r[6],pembayaran:r[7]}));
     if(!kul.length) return toast('Sheet "Detail Kulakan" tidak berisi data.','error');
     const supplierByName=new Map(supplierRows.map(s=>[s.nama,s]));
