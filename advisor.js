@@ -244,23 +244,26 @@
     // Kenaikan harga satuan: pembelian terakhir vs sebelumnya (seluruh riwayat struk).
     const history = {};
     parseReceipts(allList).sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach(r => r.items.forEach(it => {
-      const key = normName(it.name), price = num(it.unitPrice);
-      if (!key || price <= 0 || /tidak terbaca/.test(key)) return;
-      (history[key] = history[key] || []).push({ date: r.date, price, name: String(it.name).trim(), supplier: r.supplier, id: r.id });
+      const name = String(it.name || '').trim();
+      const key = normName(name), price = num(it.unitPrice);
+      if (!key || price <= 0 || /tidak terbaca/.test(key) || /angkut|transport|ongkir/i.test(name)) return;
+      (history[key] = history[key] || []).push({ date: r.date, price, name, supplier: r.supplier, id: r.id });
     }));
     const priceChanges = [];
-    Object.keys(history).forEach(k => {
+        Object.keys(history).forEach(k => {
       const h = history[k];
       for (let i = h.length - 1; i > 0; i--) {
         if (h[i].id !== h[i - 1].id) {
           const change = (h[i].price - h[i - 1].price) / h[i - 1].price;
-          priceChanges.push({ name: h[i].name, from: h[i - 1].price, to: h[i].price, change, date: h[i].date, supplier: h[i].supplier });
+          if (change < 5 && change > -0.9) { // Filter ekstrem: abaikan jika > 500% atau < -90% (biasanya salah input/OCR)
+            priceChanges.push({ name: h[i].name, from: h[i - 1].price, to: h[i].price, change, date: h[i].date, supplier: h[i].supplier });
+          }
           break;
         }
       }
     });
     priceChanges.sort((a, b) => b.change - a.change);
-    return { suppliers, supplierTotal, topItems, priceRises: priceChanges.filter(c => c.change >= 0.05), priceDrops: priceChanges.filter(c => c.change <= -0.05).reverse(), receiptCount: periodReceipts.length };
+    return { suppliers, supplierTotal, topItems, priceRises: priceChanges.filter(c => c.change >= 0.01), priceDrops: priceChanges.filter(c => c.change <= -0.01).reverse(), receiptCount: periodReceipts.length };
   }
 
   // ------------------------------------------------------------------ anomali
@@ -757,7 +760,7 @@
       table(['Barang', 'Belanja'], r.topItems.slice(0, 8).map(i => [esc(i.name) + ' <span class="text-slate-400">(' + i.count + '×)</span>', rpShort(i.spend)]), 'Belum ada rincian barang di periode ini.');
     $('adv-prices').innerHTML = '<h3 class="font-bold text-slate-800 text-sm uppercase tracking-wider mb-1"><i class="fas fa-tags text-rose-600 mr-1.5"></i>Perubahan Harga Kulakan</h3><p class="text-[11px] text-slate-400 mb-3">Pembelian terakhir vs sebelumnya (nama barang sama).</p>' +
       table(['Barang', 'Harga', 'Ubah'], r.priceRises.slice(0, 5).map(p => [esc(p.name), rpShort(p.from) + ' → ' + rpShort(p.to), '<span class="adv-delta-down font-bold">+' + pct(p.change, 0) + '</span>'])
-        .concat(r.priceDrops.slice(0, 3).map(p => [esc(p.name), rpShort(p.from) + ' → ' + rpShort(p.to), '<span class="adv-delta-up font-bold">' + pct(p.change, 0) + '</span>'])), 'Belum ada kenaikan/penurunan harga ≥ 5% yang terdeteksi.');
+              .concat(r.priceDrops.slice(0, 3).map(p => [esc(p.name), rpShort(p.from) + ' → ' + rpShort(p.to), '<span class="adv-delta-up font-bold">' + pct(p.change, 0) + '</span>'])), 'Belum ada kenaikan/penurunan harga ≥ 1% yang terdeteksi.');
   }
 
   function pnlRows(all) {
