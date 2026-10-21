@@ -56,20 +56,26 @@ function rowEconomics(row){
   const qty=Number(row.qty);
   const hargaBeli=Number(row.harga_beli);
   const sellingPrice=row.harga_jual==null||row.harga_jual===''?null:Number(row.harga_jual);
+  const multiplier=Number(row.isi_per_satuan)||1;
   
-  // Total Modal = Total Qty (pcs) x Harga Beli per Unit
+  // TOTAL MODAL = Total Qty (pcs) x Harga Beli per Unit
   const totalModal=Number.isFinite(qty)&&qty>0&&Number.isFinite(hargaBeli)&&hargaBeli>0 ? qty * hargaBeli : 0;
   
-  // HPP per unit adalah harga_beli itu sendiri karena sudah dinormalisasi per unit saat import
+  // HPP per unit adalah harga_beli itu sendiri
   const hpp=hargaBeli;
   
   const hasSellingPrice=Number.isFinite(sellingPrice)&&sellingPrice>0;
-  const rev=hasSellingPrice ? (qty * sellingPrice) : 0;
   
-  // Laba kotor = (Harga Jual per Unit - Harga Beli per Unit) x Total Qty
-  const laba=hasSellingPrice ? (sellingPrice - hpp) * qty : null;
+  // SAFETY GUARD: Jika harga jual > 5x harga beli, kemungkinan besar itu harga per dus/box.
+  // Kita normalisasi menjadi harga per unit dengan membaginya dengan multiplier.
+  const finalSellingPrice = (hasSellingPrice && sellingPrice > hpp * 5) ? sellingPrice / multiplier : sellingPrice;
   
-  // Margin = Laba Kotor / Total Penjualan
+  const rev=hasSellingPrice ? (qty * finalSellingPrice) : 0;
+  
+  // LABA KOTOR = (Harga Jual per Unit - Harga Beli per Unit) x Total Qty
+  const laba=hasSellingPrice ? (finalSellingPrice - hpp) * qty : null;
+  
+  // MARGIN = Laba Kotor / Total Penjualan
   const margin=hasSellingPrice && rev>0 ? laba/rev : null;
   
   return {...row,qty,total_modal:totalModal,rev,laba,hpp,margin};
