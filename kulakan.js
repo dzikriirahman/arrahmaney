@@ -57,16 +57,16 @@ function rowEconomics(row){
   const hargaBeli=Number(row.harga_beli);
   const sellingPrice=row.harga_jual==null||row.harga_jual===''?null:Number(row.harga_jual);
   
-  // Total Modal = Qty x Harga Beli (Sesuai data excel yang sudah dinormalisasi saat import)
+  // Total Modal = Total Qty (pcs) x Harga Beli per Unit
   const totalModal=Number.isFinite(qty)&&qty>0&&Number.isFinite(hargaBeli)&&hargaBeli>0 ? qty * hargaBeli : 0;
   
-  // HPP per unit = Total Modal / Qty (Jika qty > 1), jika tidak maka harga beli itu sendiri
-  const hpp=qty>1 && totalModal>0 ? totalModal/qty : hargaBeli;
+  // HPP per unit adalah harga_beli itu sendiri karena sudah dinormalisasi per unit saat import
+  const hpp=hargaBeli;
   
   const hasSellingPrice=Number.isFinite(sellingPrice)&&sellingPrice>0;
   const rev=hasSellingPrice ? (qty * sellingPrice) : 0;
   
-  // Laba kotor = (Harga Jual per unit - HPP per unit) x Qty
+  // Laba kotor = (Harga Jual per Unit - Harga Beli per Unit) x Total Qty
   const laba=hasSellingPrice ? (sellingPrice - hpp) * qty : null;
   
   // Margin = Laba Kotor / Total Penjualan
