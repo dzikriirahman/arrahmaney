@@ -25,7 +25,7 @@ Prinsip utama: **"Kode yang belum dijalankan dianggap belum selesai."**
 - Mengubah file di luar folder project.
 - Menghapus data/folder penting tanpa backup atau checkpoint.
 - Menyentuh akun, uang, atau sistem produksi nyata (deploy produksi, pembayaran, kirim email/pesan ke orang sungguhan) kecuali user meminta eksplisit.
-- Menampilkan atau meng-commit secret (API key, token, password).
+- Menampilkan atau meng-commit secret (API key, token, password) harus mendapatkan izin Owner.
 
 ## 3. Definisi Selesai (Definition of Done)
 
@@ -159,7 +159,98 @@ Simpan status di `PROGRESS.md` di root project, supaya sesi baru tidak perlu riw
 - Pekerjaan rutin (edit kecil, format, rename) cukup memakai model hemat.
 - Model kuat hanya untuk masalah sulit atau keputusan arsitektur.
 
-## 11. Template Tugas dari User (Opsional)
+## 11. Arsitektur Otak AI (Qwen Live)
+
+"Qwen" adalah nama panggilan untuk asisten toko. Worker di belakangnya bebas diganti.
+
+### 11.1 Rantai jawaban (urutan percobaan)
+
+| Urutan | Layanan | Berkas | Fungsi |
+|--------|---------|--------|--------|
+| 1 | Rowboat (provider `google`) | `chatbubble.py` |Utama: agent `kasir-ar-rahman` + 20 tool MCP kasir |
+| 2 | Rowboat, model lain | `chatbubble.py` | Retry otomatis kalau model sebelumnya kena kuota |
+| 3 | Gemini REST + MCP | `gemini_mcp.py` | Bypass Rowboat, tool kasir dijalankan lokal |
+| 4 | Ollama cloud (`minimax-m3.1-flash:cloud`) | `chatbubble.py` | Banting, **tanpa akses data toko** |
+| 5 | Pesan jujur ke user | `chatbubble.py` | Menjelaskan kuota habis, bukan mengarang angka |
+
+### 11.2 Batas kuota Gemini free tier — WAJIB DILALUI
+
+- **20 request per HARI per model** (`GenerateRequestsPerDayPerModel-FreeTier`).
+- Satu turn Rowboat = 2-3 request (model call + tool call + ulang).
+- `gemini_mcp.py` menyimpan cache kuota di `gemini-kuota.json` (TTL 20 jam) dan
+  merotasi 8 model: `gemini-3.7-flash`, `gemini-3.5-flash-lite`,
+  `gemini-flash-lite-latest`, `gemini-3.1-flash-lite`, `gemini-flash-latest`,
+  `gemini-3.8-flash`, `gemini-3.5-flash`, `gemini-3.6-flash`.
+- Model dipakai per-request lewat `config.agent.overrides.model` (Rowboat
+  mengabaikan model di `sessions:sendMessage` tanpa override).
+- **Jangan benchmark semua model sekaligus** — itu menghabiskan kuota harian.
+  Satu turn Rowboat saja sudah memakai kuota 3 model.
+- `_tanya_ollama()` tidak punya tool kasir, jadi jawabannya harus jujur
+  (sudah diatur di system prompt fallback).
+
+### 11.3 Konfigurasi provider (Rowboat)
+
+- `C:\Users\Lenovo\.rowboat\config\models.json` → `providers.google` =
+  `{ "flavor": "google", "apiKey": "...", "contextLength": 1048576 }`.
+  `provider` di agent `.md` harus **nama key** di `providers`, bukan `flavor`.
+  Kalau key tidak ada → `resolveProviderConfig()` melempar error dan turn
+  menggantung selamanya di `turn_created`.
+- `C:\Users\Lenovo\.rowboat\agents\kasir-ar-rahman.md` → frontmatter
+  `provider` + `model`.
+- Restart Rowboat setelah ganti config (port RPC `127.0.0.1:3220`).
+
+### 11.4 Aturan WhatsApp (dari agent kasir)
+
+- `kirim_pesan_whatsapp` **hanya jalan atas perintah eksplisit user**.
+- `gemini_mcp.py` memblokir tool WA kalau tidak ada perintah eksplisit.
+- Jadwal rekap otomatis: setiap hari 19:00 (`wa/jadwal.ts`).
+- Kalau kasir tidak ada penjualan → pesan hanya ke nomor owner.
+- Baileys hanya boleh satu koneksi per akun. `wa/jadwal.ts` membuka koneksi
+  on-demand (hanya saat mengirim), `wa/kirim.ts` memakai socket aktif yang ada.
+
+### 11.5 Larangan
+
+- **Jangan jalankan model lokal** (laptop sedang dipakai operasional toko).
+  Semua model harus online.
+- Jangan menambah file uji/scratch ke project. Bersihkan setelah test.
+- **Jangan benchmark semua model sekaligus** — kuota 20 request/hari per
+  model habis dalam hitungan menit.
+
+### 11.6 Data & hak akses (source_code)
+
+- Data di Supabase project `bxdzfuzrvgbdenawxtba` (bukan `knyihjmnvkih...`).
+  Anon key ada di `source_code/index.html` (`SUPABASE_ANON_KEY`).
+- Tabel: `kulakan`, `supplier_kulakan`, `transactions`.
+- Akses tulis **hanya** untuk `dzikrii.rahman@gmail.com` (cek
+  `window.isAppOwner()`). Elemen khusus owner pakai atribut `data-owner-only`
+  → disembunyikan oleh CSS `.app-viewer [data-owner-only]`.
+- Hapus supplier **TIDAK** menghapus baris `kulakan` yang memakainya. Dialog
+  konfirmasi wajib menyebut jumlah baris terdampak.
+- Nama supplier adalah kunci baris kulakan (`kulakan.supplier`), jadi **tidak
+  boleh diubah** saat edit — form edit membuat kolom nama readonly.
+- Deploy: `npm run build` lalu `npx wrangler deploy` (worker `arrahman`).
+  `dist/` ada di `.gitignore`; commit hanya `kulakan.js` / `kulakan.css`.
+- Push bisa ditolak karena Cloudflare bot ikut commit `AGENTS.md`. Solusi:
+  `git rebase origin/main` lalu `git push origin main`.
+
+### 11.7 Jebakan Rowboat yang sudah pernah terjadi
+
+| Gejala | Akar masalah | Solusi |
+|--------|--------------|--------|
+| Turn menggantung selamanya di `turn_created` | `provider` di agent `.md` = nama key di `models.json.providers`, bukan `flavor`. Key hilang → `resolveProviderConfig()` throw | Tambahkan key `google` dengan `flavor: "google"` |
+| `models:test` / `models:getConfig` HTTP 400 | `models:test` butuh `provider` sebagai **objek** LlmProvider, bukan string. `models:getConfig` butuh body `null` | Kirim `{"provider":{"flavor":"google","apiKey":"..."},"model":"..."}` |
+| Qwen jawab "18 Mei 2025, Rp 0" | Sesi lama membawa turn dari provider/masa lalu → konteks tercemar | Hapus sesi, buat sesi baru (lihat `qwen-live-sesi.txt`) |
+| Ribuan sesi "| Qwen Live" bertumpuk | Retry loop membuat sesi baru tiap gagal-kuota | **Reuse sesi yang sama**; model di-override per-request |
+| Rowboat mengabaikan `model` di `sessions:sendMessage` | Field model tidak ada di payload | Pakai `config.agent.overrides.model = {provider, model}` |
+
+### 11.8 Sesi Rowboat
+
+- Sesi produksi disimpan di `qwen-live-sesi.txt` (root project).
+- Sesi produksi harus **bersih** (turn pertama, tanpa riwayat model lain).
+- Kalau jawabannya meleset (tanggal/angka aneh), periksa `sessions:list` —
+  jangan sampai sesi produksi punya banyak turn dari percobaan sebelumnya.
+
+## 12. Template Tugas dari User (Opsional)
 
 ```
 TUJUAN: (apa yang ingin dicapai)
