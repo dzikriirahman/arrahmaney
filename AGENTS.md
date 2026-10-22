@@ -241,8 +241,67 @@ retry dengan model lain.
 - `gemini_mcp.py` memblokir tool WA kalau tidak ada perintah eksplisit.
 - Jadwal rekap otomatis: setiap hari 19:00 (`wa/jadwal.ts`).
 - Kalau kasir tidak ada penjualan → pesan hanya ke nomor owner.
-- Baileys hanya boleh satu koneksi per akun. `wa/jadwal.ts` membuka koneksi
-  on-demand (hanya saat mengirim), `wa/kirim.ts` memakai socket aktif yang ada.
+- **Satu koneksi Baileys saja per akun.** Server MCP (`server.ts` → `wa/kirim.ts`)
+  adalah **pemilik tunggal** koneksi WhatsApp. `wa/jadwal.ts` **TIDAK** membuka
+  koneksi Baileys sendiri — ia meneruskan pesan ke tool MCP lewat
+  `wa/kirim-via-mcp.ts`. Kunci lintas-proses: `wa/koneksi.lock` (PID pemilik).
+
+### 11.5.1 Laporan harian dobel — sudah diperbaiki (22 Okt 2026)
+
+**Gejala:** Dzikri menerima 2 pesan di group: satu dari rekap terjadwal 19:00
+(`wa/jadwal.ts`), satu lagi dari Qwen Live 10 detik kemudian.
+
+**Akar penyebab (3 lapis, semuanya sudah ditutup):**
+
+1. **Salah mengartikan pertanyaan.** Tanya "qwen paling laris hari ini apa saja"
+   memicu Qwen membuat + mengirim laporan harian. → Diperbaiki di
+   `~/.rowboat/agents/kasir-ar-rahman.md` dan
+   `~/.rowboat/skills/kasir-pos/SKILL.md`: pertanyaan analisis data
+   ("paling laris hari ini", "omzet hari ini") dijawab **di chat** dengan tool
+   data, **tidak pernah** memicu `kirim_pesan_whatsapp`.
+2. **Tidak ada guard anti-dobel.** → `wa/rekap-terkirim.ts` (baru): setelah
+   rekap terjadwal terkirim, penanda ditulis ke `wa/rekap-terkirim.json`.
+   Tool `kirim_pesan_whatsapp` di `server.ts` membaca penanda itu dan
+   **menolak** mengirim rekap yang sama pada tanggal yang sama.
+3. **Pesan menggantung "waiting for message".** Dua proses Baileys (jadwal +
+   MCP) berebut satu koneksi WhatsApp → saling menendang → `sendMessage`
+   menggantung selamanya. → (a) `wa/jadwal.ts` kini proxy ke MCP, tidak pernah
+   buka koneksi sendiri; (b) `wa/kirim.ts` punya timeout 30 detik per
+   `sendMessage` (`denganBatasWaktu`); (c) `wa/koneksi.lock` mencegah
+   koneksi kedua.
+
+**Penting:** kalau(`wa/koneksi.lock` hilang) / proses mati mendadak, hapus file
+itu sebelum menyalakan ulang service.
+
+**Cara tes cepat (tidak mengirim pesan sungguhan ke group):**
+
+```powershell
+$key = (Get-Content 'd:\kasir-mcp-sketch\wa\mcp-auth.json' -Raw | ConvertFrom-Json).Authorization
+# kirim pesan rekap → harus DITOLAK
+# (lihat mcp-akses.log: tool=kirim_pesan_whatsapp)
+```
+
+### 11.5.2 Backup secret
+
+`backup-secret.py` (root project) mengbacks-up **semua** secret ke SATU file
+terenkripsi AES-256-GCM: `secret-backup/rahasia-toko.enc`.
+
+- Isi: 4 env var user Windows (`KASIR_MCP_TOKEN`, `GEMINI_API_KEY`,
+  `GOOGLE_API_KEY`, `CLOUDFLARE_API_TOKEN`), 8 file sensitif (sesi WhatsApp
+  Baileys, token MCP, `models.json`, `mcp.json`, kunci Rowboat, OAuth token
+  Wrangler, config Ollama), + `SUPABASE_URL` & `SUPABASE_ANON_KEY`.
+- Nilai secret **tidak pernah** dicetak ke terminal/log.
+- `secret-backup/` + `*.enc` sudah masuk `.gitignore` (root).
+
+```powershell
+python backup-secret.py            # buat backup baru (minta frasa sandi)
+python backup-secret.py --verify   # bukti backup cocok dengan sumber live
+python backup-secret.py --list     # daftar isi (nama saja)
+python backup-secret.py --restore  # pulihkan ke env & file
+```
+
+**Frasa sandi** harus disimpan terpisah (password manager). Tanpa itu file
+backup tidak bisa dibuka.
 
 ### 11.6 Larangan
 
