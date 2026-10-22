@@ -353,13 +353,19 @@ Membuat token (butuh login dashboard):
 - **Account token** (`cfat_...`, lebih permanen, recommended):
   https://dash.cloudflare.com/2eb226a4cb90e1d9f3b97c12de9d8101/account/api-tokens
 
-Permission yang wajib dicentang:
-- **Account → Workers Scripts → Edit**
-- Account → Workers AI → Read (opsional, untuk uji model)
-- Account → Account Settings → Read (opsional)
+Permission yang wajib dicentang (nama persis di dashboard):
+- **Account → Workers Scripts Write → Edit** ← WAJIB untuk deploy
+  (permission id `e086da7e2179491d91ee5f35b3ca210a`)
+- Account → Workers Scripts Read → Read (opsional, cukup untuk melihat)
 - **Zone permissions: KOSONGKAN** — akun ini tidak punya zone
 - Account Resources → Include → Specific account →
   `Dzikrii.rahman@gmail.com's Account`
+
+Catatan: di dashboard **tidak ada** permission bernama "Workers Scripts" saja
+atau "Edit Cloudflare Workers" sebagai permission policy — yang ada
+**"Workers Scripts Write"** dan **"Workers Scripts Read"**. Template
+"Edit Cloudflare Workers" (11 permissions) sudah mencakup keduanya, jadi
+paling mudah: pilih template itu lalu tampilkan detailnya.
 
 Verifikasi token: `GET https://api.cloudflare.com/client/v4/user/tokens/verify`
 (header `Authorization: Bearer <token>`). **Wajib** kirim `User-Agent` — tanpa
