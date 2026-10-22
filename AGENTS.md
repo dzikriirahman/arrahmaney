@@ -178,6 +178,12 @@ Endpoint `/api/ai` di Worker punya rantainya sendiri: Gemini (rotasi model)
 → Workers AI (`@cf/openai/gpt-oss-120b`, `@cf/meta/llama-3.2-3b-instruct`).
 Bisa dipaksa lewat `{"provider": "workers-ai"}` untuk testing.
 
+**Cara memanggil worker dari script** (WAJIB pakai helper, jangan tulis
+request sendiri):
+- Python → `worker_ai.tanya_worker(prompt, system=..., max_tokens=...)`
+- PowerShell → `.\worker-ai.ps1 -Prompt "..." [-Provider workers-ai]`
+- Node/TS → `fetch` biasa aman (UA otomatis `node`).
+
 ### 11.2 Model Gemini yang TERBUKTI benar — JANGAN tambah sembarangan
 
 Diuji 2x pada 22 Okt 2026 (tepat tanggal + tool-calling + jawaban benar):
@@ -270,9 +276,16 @@ retry dengan model lain.
   - `@cf/meta/llama-3.2-3b-instruct` → `{ response: "teks" }`
   - `@cf/google/gemma-2b-it-lora` → `{ generated_text: "teks" }`
   Parser di `worker.js` sudah menangani ketiganya.
-- Cloudflare WAF memblokir request tanpa `User-Agent` browser + `Origin`/
-  `Referer` yang cocok → 403 "error code: 1010". Selalu kirim header itu
-  saat memanggil endpoint worker dari script.
+- Cloudflare WAF: **`workers.dev` memakai "Browser Integrity Check" (WAF)**
+  yang aktif otomatis. Request dengan User-Agent kosong atau
+  `Python-urllib/*` → **HTTP 403 "error code: 1010"**. User-Agent lain
+  (`QwenLive/1.0`, `curl/8.0`, `Mozilla/5.0`, `Node.js/20`, `axios/1.7`,
+  `PostmanRuntime/7.39`) **lolos**. Akun ini **tidak punya zone** (cuma
+  `workers.dev`) jadi **tidak ada** menu Security > Threats > Rules untuk
+  dimatikan — dan tidak perlu, karena cukup kirim User-Agent yang benar.
+  **Selalu pakai `worker_ai.py` (Python) atau `worker-ai.ps1` (PowerShell)**
+  untuk memanggil worker; keduanya sudah memasang header yang benar.
+  `server.ts` aman karena `fetch` Node otomatis kirim UA `node`.
 
 ### 11.7.1 Grant Data API Supabase (WAJIB — 30 Okt 2026)
 
@@ -293,10 +306,6 @@ terpengaruh.
 - **Cara menjalankan**: buka file SQL → salin **ISI** file → paste di
   Supabase > SQL Editor > New query > Run. **Jangan tulis nama file di SQL
   Editor** (SQL Editor hanya menerima SQL, bukan path file).
-- Sequence hanya perlu di-grant untuk tabel ber-`generated always as identity`.
-  Di project ini hanya `kulakan` & `supplier_kulakan` yang punya sequence
-  (`transactions.id` dan `receivables.id` bertipe `text`; `business_settings`
-  tidak punya kolom `id`).
 - Cek hasil:
   ```sql
   select table_name, grantee, privilege_type
