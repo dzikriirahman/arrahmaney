@@ -366,8 +366,27 @@ Jadi di UI Akun ini permission-nya **1 baris "Workers Scripts" dengan 2 kolom
 dari template; yang WAJIB dicentang manual adalah kolom **Edit** (itu yang
 memberi izin deploy).
 
+Isi template **"Edit Cloudflare Workers"** (11 permissions, dari docs resmi
+`developers.cloudflare.com/fundamentals/api/reference/template/`):
+
+| Permission | Resource |
+|---|---|
+| Workers Routes Write | Zone |
+| **Workers Scripts Write** | **Account** ← yang kita butuh |
+| Workers KV Storage Write | Account |
+| Workers Tail Read | Account |
+| Workers R2 Storage Write | Account |
+| Account Settings Read | Account |
+| User Details Read | User |
+| User Memberships Read | User |
+
+Di UI, "Workers Scripts Write" dirender sebagai baris **"Workers Scripts"**
+dengan dua kolom (Read | Edit). Jadi Developer Platform menampilkan 4 baris:
+Cloud Connector | Workers Routes | **Workers Scripts** | Workers KV Storage
+(versi Read dan Write digabung ke satu baris dengan 2 kolom).
+
 Langkah di dashboard (Account API tokens → Create a token):
-1. Template **"Edit Cloudflare Workers"** (11 permissions) → expanded, kategori
+1. Template **"Edit Cloudflare Workers"** → expanded, kategori
    **Developer Platform** (4/4).
 2. Baris **"Workers Scripts"**: centang kolom **Edit** (Read biasanya sudah
    tercentang).
