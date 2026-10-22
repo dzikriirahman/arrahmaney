@@ -353,19 +353,31 @@ Membuat token (butuh login dashboard):
 - **Account token** (`cfat_...`, lebih permanen, recommended):
   https://dash.cloudflare.com/2eb226a4cb90e1d9f3b97c12de9d8101/account/api-tokens
 
-Permission yang wajib dicentang (nama persis di dashboard):
-- **Account → Workers Scripts Write → Edit** ← WAJIB untuk deploy
-  (permission id `e086da7e2179491d91ee5f35b3ca210a`)
-- Account → Workers Scripts Read → Read (opsional, cukup untuk melihat)
-- **Zone permissions: KOSONGKAN** — akun ini tidak punya zone
-- Account Resources → Include → Specific account →
-  `Dzikrii.rahman@gmail.com's Account`
+Permission yang wajib dicentang — **penting: nama di UI dashboard berbeda
+dari nama di Cloudflare API.**
 
-Catatan: di dashboard **tidak ada** permission bernama "Workers Scripts" saja
-atau "Edit Cloudflare Workers" sebagai permission policy — yang ada
-**"Workers Scripts Write"** dan **"Workers Scripts Read"**. Template
-"Edit Cloudflare Workers" (11 permissions) sudah mencakup keduanya, jadi
-paling mudah: pilih template itu lalu tampilkan detailnya.
+| Di UI dashboard (yang dilihat user) | Di Cloudflare API (permission_groups) |
+|---|---|
+| Baris **"Workers Scripts"**, kolom **Read** | `Workers Scripts Read` (id `1a71c399035b4950a1bd1466bbe4f420`) |
+| Baris **"Workers Scripts"**, kolom **Edit** | `Workers Scripts Write` (id `e086da7e2179491d91ee5f35b3ca210a`) |
+
+Jadi di UI Akun ini permission-nya **1 baris "Workers Scripts" dengan 2 kolom
+(Read | Edit)** — bukan dua baris terpisah. **Read** sudah otomatis tercentang
+dari template; yang WAJIB dicentang manual adalah kolom **Edit** (itu yang
+memberi izin deploy).
+
+Langkah di dashboard (Account API tokens → Create a token):
+1. Template **"Edit Cloudflare Workers"** (11 permissions) → expanded, kategori
+   **Developer Platform** (4/4).
+2. Baris **"Workers Scripts"**: centang kolom **Edit** (Read biasanya sudah
+   tercentang).
+3. Kalau kolom Edit tidak bisa diklik (role akun membatasi) → **Bulk Select →
+   "Write all resources"**.
+4. **Zone permissions: KOSONGKAN** — akun ini tidak punya zone.
+5. **Account Resources → Include → Specific account →
+   `Dzikrii.rahman@gmail.com's Account`**.
+6. Continue to summary → Create Token. Token hanya ditampilkan SEKALI
+   (format `cfat_` untuk account token, `cfut_` untuk user token).
 
 Verifikasi token: `GET https://api.cloudflare.com/client/v4/user/tokens/verify`
 (header `Authorization: Bearer <token>`). **Wajib** kirim `User-Agent` — tanpa
@@ -374,6 +386,28 @@ itu Cloudflare balas 403 / 1010.
 Akun ini **pakai SSO Google**. Kalau login dashboard gagal: pakai email yang
 **sama persis** dengan yang terdaftar di Cloudflare
 (`dzikrii.rahman@gmail.com`). Alternatif tanpa dashboard: `npx wrangler login`.
+
+Tambahan penting (terverifikasi 22 Okt 2026 via Cloudflare API):
+
+- Role akun: **Super Administrator - All Privileges**
+  (`worker: {edit: true, read: true}`). Jadi permission "Workers Scripts"
+  kolom **Edit BISA** dicentang. Pesan "Selectable permission groups are
+  limited to actions based on your account membership roles" cuma
+  informatif, bukan error.
+- Akun **tidak punya zone** -> semua permission Zone memang tidak tersedia.
+  Itu normal, bukan masalah.
+- Token OAuth `wrangler login` punya scope `workers_scripts:write` +
+  `account:read` + `user:read` - **cukup untuk deploy**, tapi **tidak** punya
+  scope pembuatan API token (`account_api_tokens:write`). Jadi **API token
+  hanya bisa dibuat lewat dashboard**, tidak bisa lewat API.
+- `GET /accounts/<id>/tokens/permission_groups` dan
+  `POST /accounts/<id>/tokens` -> **403 (9109)** kalau pakai token OAuth
+  wrangler. Jangan coba bypass lewat API.
+- OAuth wrangler expired **2026-10-22 08:44 UTC (15:44 WIB)**. Cek
+  `expiration_time` di
+  `%APPDATA%\xdg.config\.wrangler\config\default.toml`. Kalau sudah lewat:
+  `npx wrangler login` (browser OAuth) atau pakai `CLOUDFLARE_API_TOKEN`
+  permanen.
 
 ## 12. Template Tugas dari User (Opsional)
 
