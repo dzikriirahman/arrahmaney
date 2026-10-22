@@ -1,7 +1,12 @@
 const OWNER_EMAIL = 'dzikrii.rahman@gmail.com';
 const SUPABASE_URL = 'https://bxdzfuzrvgbdenawxtba.supabase.co';
 const OCR_PATH = '/.netlify/functions/gemini-receipt-ocr';
+const AI_PATH = '/api/ai';
 const DEFAULT_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+// Model Workers AI (gratis, 10.000 neuron/hari) sebagai cadangan saat kuota
+// Gemini habis. gpt-oss-120b hanya bisa teks (bukan vision), jadi dipakai
+// untuk chat/analisis, bukan OCR foto struk.
+const CF_AI_MODELS = ['@cf/openai/gpt-oss-120b', '@cf/meta/llama-3.2-3b-instruct'];
 const STAGE_PROMPTS = {
   name: 'Transkripsikan HANYA nama-nama barang yang tercetak pada struk. Satu nama barang per baris, pertahankan urutan dari atas ke bawah. Abaikan nama toko, alamat, tanggal, nomor invoice, subtotal, total, pembayaran, dan teks non-barang. Jangan menebak atau menambahkan barang yang tidak terbaca; jika nama tidak terbaca, tulis [TIDAK TERBACA]. Keluarkan teks mentah saja tanpa judul, bullet, nomor urut, atau penjelasan.',
   qty: 'Transkripsikan HANYA jumlah/kuantitas tiap barang pada struk, satu nilai per baris, sesuai urutan barang dari atas ke bawah. Jangan masukkan harga atau total uang. Pertahankan angka desimal bila ada. Jangan menebak angka yang tidak terbaca; tulis [TIDAK TERBACA]. Keluarkan hanya nilai mentah satu per baris, tanpa judul, bullet, satuan, atau penjelasan.',
@@ -139,10 +144,105 @@ async function runOcr(request, env) {
   return json({ error: 'Layanan Gemini sedang bermasalah. Coba lagi beberapa saat.', detail }, 502);
 }
 
+async function runAi(request, env) {
+  if (request.method !== 'POST') return json({ error: 'Metode tidak diizinkan.' }, 405);
+
+  // Endpoint ini dipakai untuk chat/analisis. Berbeda dengan OCR, tidak
+  // butuh foto, jadi boleh dipakai juga dari skrip backend (dengan token
+  // pemilik) maupun dari bubble chat.
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Badan permintaan tidak valid.' }, 400);
+  }
+  const prompt = String(body.prompt || '').trim();
+  if (!prompt) return json({ error: 'Prompt kosong.' }, 400);
+  const system = String(body.system || '').trim();
+  const maxTokens = Math.min(Number(body.maxTokens) || 1024, 4096);
+  // "provider": "gemini" | "workers-ai" | "auto" (default).
+  // "workers-ai" dipakai untuk memaksa jalur cadangan tanpa menunggu Gemini gagal.
+  const mauProvider = String(body.provider || 'auto').trim().toLowerCase();
+  const forceCf = mauProvider === 'workers-ai' || mauProvider === 'cf' || mauProvider === 'cloudflare';
+
+  const geminiKey = String(env.GEMINI_API_KEY || '').trim();
+  const models = modelList(env);
+  const attempts = [];
+
+  // 1) Gemini (utama)
+  for (const model of (forceCf ? [] : models)) {
+    if (!geminiKey) break;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 45000);
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: system ? `${system}\n\n${prompt}` : prompt }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: maxTokens }
+        }),
+        signal: controller.signal
+      });
+      const data = await response.json().catch(() => ({}));
+      const text = (data?.candidates?.[0]?.content?.parts || []).map(part => part?.text || '').join('').trim();
+      if (response.ok && text) return json({ text, model, provider: 'gemini', attempts });
+      attempts.push({ model, status: response.status, message: String(data?.error?.message || 'Balasan kosong.').slice(0, 160) });
+    } catch (error) {
+      attempts.push({ model, status: 0, message: String(error?.message || error).slice(0, 200) });
+    } finally {
+      clearTimeout(timer);
+    }
+    // 404 / 429 / 5xx -> coba model berikutnya. Error lain (401/403) = kunci salah.
+    const last = attempts[attempts.length - 1];
+    if (last && last.status && ![404, 429, 500, 502, 503, 504, 0].includes(last.status)) break;
+  }
+
+  // 2) Workers AI (gratis) sebagai cadangan
+  if (env.AI) {
+    for (const model of CF_AI_MODELS) {
+      try {
+        const response = await env.AI.run(model, {
+          messages: [
+            ...(system ? [{ role: 'system', content: system }] : []),
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: maxTokens
+        });
+        // Workers AI mengembalikan bentuk berbeda per model:
+        //   - @cf/openai/gpt-oss-120b : { choices: [{ message: { content } }] }
+        //   - model chat llama/mistral : { response: "teks" }
+        //   - model completion gemma   : { generated_text: "teks" }
+        const kandidat = [
+          response?.response,
+          response?.generated_text,
+          response?.choices?.[0]?.message?.content,
+          response?.choices?.[0]?.text,
+          typeof response === 'string' ? response : null
+        ].map(value => (typeof value === 'string' ? value.trim() : '')).find(Boolean);
+        if (kandidat) return json({ text: kandidat, model, provider: 'workers-ai', attempts });
+        attempts.push({ model, status: 0, message: 'Balasan Workers AI kosong.', raw: JSON.stringify(response).slice(0, 200) });
+      } catch (error) {
+        attempts.push({ model, status: 0, message: String(error?.message || error).slice(0, 200) });
+      }
+    }
+  }
+
+  const detail = attempts.length ? attempts[attempts.length - 1] : null;
+  if (detail && detail.status === 429) {
+    return json({ error: 'Kuota AI habis (Gemini free tier 20 permintaan/hari per model). Coba lagi setelah tengah malam.', detail: attempts }, 429);
+  }
+  if (detail && (detail.status === 401 || detail.status === 403)) {
+    return json({ error: 'API key AI ditolak. Periksa secret GEMINI_API_KEY.', detail: attempts }, 502);
+  }
+  return json({ error: 'Semua penyedia AI sedang bermasalah.', detail: attempts }, 502);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === OCR_PATH) return runOcr(request, env);
+    if (url.pathname === AI_PATH) return runAi(request, env);
     return env.ASSETS.fetch(request);
   }
 };

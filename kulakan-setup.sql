@@ -20,3 +20,14 @@ revoke all on public.supplier_kulakan, public.kulakan from anon;
 grant select,insert,update,delete on public.supplier_kulakan, public.kulakan to authenticated;
 drop policy if exists "login_all" on public.supplier_kulakan; create policy "login_all" on public.supplier_kulakan for all to authenticated using(true) with check(true);
 drop policy if exists "login_all" on public.kulakan;  create policy "login_all" on public.kulakan  for all to authenticated using(true) with check(true);
+
+-- Grant Data API (Wajib sejak 30 Okt 2026).
+-- Supabase berhenti memberi grant otomatis ke tabel yang dibuat setelah tanggal itu,
+-- jadi tabel baru WAJIB diberi grant eksplisit di file yang sama yang membuat tabelnya.
+-- Jalankan supabase-public-viewer.sql setelah file ini untuk mengaktifkan
+-- tampilan publik (baca saja) + hak tulis khusus pemilik.
+grant select on public.supplier_kulakan, public.kulakan to anon;
+grant select,insert,update,delete on public.supplier_kulakan, public.kulakan to authenticated;
+grant select,insert,update,delete on public.supplier_kulakan, public.kulakan to service_role;
+grant usage, select on sequence public.supplier_kulakan_id_seq to authenticated, service_role;
+grant usage, select on sequence public.kulakan_id_seq to authenticated, service_role;

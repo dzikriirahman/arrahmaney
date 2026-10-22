@@ -14,5 +14,8 @@
   },
   "vars": {
     "OWNER_EMAIL": "dzikrii.rahman@gmail.com"
+  },
+  "ai": {
+    "binding": "AI"
   }
 }

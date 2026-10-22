@@ -67,4 +67,14 @@ create policy "settings_all_login" on public.business_settings for all to authen
 revoke all on public.business_settings from anon;
 grant select, insert, update, delete on public.business_settings to authenticated;
 
+-- ---------- Grant Data API (Wajib sejak 30 Okt 2026) ----------
+-- Supabase berhenti memberi grant otomatis ke tabel yang dibuat setelah 30 Okt 2026.
+-- Tabel baru WAJIB diberi grant eksplisit di file yang sama yang membuatnya,
+-- kalau tidak PostgREST / supabase-js akan mengembalikan "permission denied".
+-- Jalankan supabase-public-viewer.sql setelah file ini untuk tampilan publik
+-- (baca saja) + hak tulis hanya untuk pemilik.
+grant select on public.transactions, public.receivables, public.business_settings to anon;
+grant select, insert, update, delete on public.transactions, public.receivables, public.business_settings to authenticated;
+grant select, insert, update, delete on public.transactions, public.receivables, public.business_settings to service_role;
+
 commit;
