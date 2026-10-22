@@ -250,7 +250,7 @@
       (history[key] = history[key] || []).push({ date: r.date, price, name, supplier: r.supplier, id: r.id });
     }));
     const priceChanges = [];
-        Object.keys(history).forEach(k => {
+    Object.keys(history).forEach(k => {
       const h = history[k];
       for (let i = h.length - 1; i > 0; i--) {
         if (h[i].id !== h[i - 1].id) {

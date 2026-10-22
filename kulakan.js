@@ -56,21 +56,21 @@ function rowEconomics(row){
   const qty=Number(row.qty);
   const hargaBeli=Number(row.harga_beli);
   const sellingPrice=row.harga_jual==null||row.harga_jual===''?null:Number(row.harga_jual);
-  const satuan=String(row.satuan||'').toLowerCase();
+  const angkut=Number(row.biaya_angkut)||0;
   
-  // Total Modal = Jumlah (PCS/KG) x Harga Beli
-  const totalModal=Number.isFinite(qty)&&qty>0&&Number.isFinite(hargaBeli)&&hargaBeli>0 ? qty * hargaBeli : 0;
+  // Total Modal = Qty x Harga Beli + Ongkos (mengikuti kolom K di Excel)
+  const totalModal=Number.isFinite(qty)&&qty>0&&Number.isFinite(hargaBeli)&&hargaBeli>0 ? qty*hargaBeli+angkut : angkut;
   
-  // HPP per unit = total modal / jumlah (jika jumlah > 1), jika tidak maka harga beli itu sendiri
-  const hpp=qty>1 && totalModal>0 ? totalModal/qty : hargaBeli;
+  // HPP per unit = Total Modal / Qty (mengikuti kolom L di Excel)
+  const hpp=qty>0&&totalModal>0 ? totalModal/qty : hargaBeli;
   
   const hasSellingPrice=Number.isFinite(sellingPrice)&&sellingPrice>0;
   const rev=hasSellingPrice ? (qty * sellingPrice) : 0;
   
-  // Laba kotor = (harga jual per unit - HPP per unit) x jumlah
+  // Laba kotor = (Harga Jual per unit - HPP per unit) x Qty (mengikuti kolom R di Excel)
   const laba=hasSellingPrice ? (sellingPrice - hpp) * qty : null;
   
-  // Margin = laba kotor / (harga jual per unit x jumlah)
+  // Margin = Laba Kotor / Total Penjualan (mengikuti kolom Q di Excel)
   const margin=hasSellingPrice && rev>0 ? laba/rev : null;
   
   return {...row,qty,total_modal:totalModal,rev,laba,hpp,margin};
@@ -304,26 +304,98 @@ async function importExcel(file){
   try{
     const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
     const detailRows=sheetRows(wb,'Detail Kulakan').filter(r=>r[5]&&String(r[0]).toLowerCase()!=='no');
-    const invalidRows=detailRows.filter(r=>typeof r[1]!=='number'||!Number.isFinite(Number(r[6]))||Number(r[6])<=0||!Number.isFinite(Number(r[8]))||Number(r[8])<=0||!String(r[4]||'').trim()||(r[9]!=null&&(!Number.isFinite(Number(r[9]))||Number(r[9])<0))||(r[12]!=null&&!Number.isFinite(Number(r[12]))));
-    if(invalidRows.length)return toast(`Impor dibatalkan: ${invalidRows.length} baris memiliki tanggal, supplier, jumlah, atau harga yang tidak valid. Periksa sheet "Detail Kulakan".`,'error');
-    let kul=detailRows.map(r=>({tanggal:ymd(r[1]),no_nota:String(r[2]??'-').trim()||'-',kategori:String(r[3]||'').trim(),supplier:ALIAS[String(r[4]).trim().toUpperCase()]||String(r[4]).trim().toUpperCase(),barang:String(r[5]).trim(),qty:Number(r[6]),satuan:String(r[7]||'unit').trim(),harga_beli:Number(r[8]),biaya_angkut:r[9]==null?0:Number(r[9]),harga_jual:r[12]==null?null:Number(r[12]),isi_per_satuan:Number(r[13])>0?Number(r[13]):1}));
+    const invalidRows=detailRows.filter(r=>{
+      const qty=Number(r[6]),totalModal=r[10]==null?null:Number(r[10]),hargaBeli=Number(r[8]);
+      const angkut=r[9]==null?0:Number(r[9]);
+      const validDate=typeof r[1]==='number'||r[1] instanceof Date;
+      const validQty=Number.isFinite(qty)&&qty>0;
+      // Total Modal (K) dipakai utama; kolom I (harga beli) hanya fallback.
+      const validPrice=(totalModal!=null&&Number.isFinite(totalModal)&&totalModal>0)
+        ||(Number.isFinite(hargaBeli)&&hargaBeli>0);
+      const validAngkut=Number.isFinite(angkut)&&angkut>=0;
+      const validJual=r[12]==null||(Number.isFinite(Number(r[12]))&&Number(r[12])>0);
+      return !validDate||!validQty||!validPrice||!validAngkut||!validJual||!String(r[4]||'').trim()||!String(r[5]||'').trim();
+    });
+    if(invalidRows.length)return toast(`Impor dibatalkan: ${invalidRows.length} baris memiliki tanggal, supplier, jumlah, harga, atau ongkos yang tidak valid. Periksa sheet "Detail Kulakan".`,'error');
+    
+    // Rekonsiliasi: (HPP/unit x Pcs/Kg) x Jumlah harus sama dengan Total Modal (K).
+    // Kalau tidak sama, berarti kolom Excel tidak sinkron dan import dibatalkan.
+    const reconRows=detailRows.filter(r=>{
+      const qty=Number(r[6]),N=Number(r[13]),L=Number(r[11]),K=Number(r[10]);
+      if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(N)||N<=0||!Number.isFinite(L)||!Number.isFinite(K))return false;
+      const chain=(L/N)*N*qty;
+      return Math.abs(chain-K)>Math.max(1,K*0.001);
+    });
+    if(reconRows.length)return toast(`Impor dibatalkan: ${reconRows.length} baris tidak rekonsiliasi. (HPP/unit x Pcs/Kg) x Jumlah harus sama dengan Total Modal. Contoh: "${reconRows[0][5]}". Perbaiki kolom K, L, atau N di Excel.`,'error');
+    let kul=detailRows.map(r=>{
+      // Kolom Excel: A=0 No, B=1 Tanggal, C=2 Nota, D=3 Kategori, E=4 Supplier, F=5 Barang,
+      // G=6 Jumlah, H=7 Satuan, I=8 Harga Beli/Unit, J=9 Angkut, K=10 Total Modal,
+      // L=11 HPP Modal/Unit, M=12 Harga Jual/Unit, N=13 Pcs/Kg
+      const qty=Number(r[6]);
+      const angkut=r[9]==null?0:Number(r[9]);
+      const totalModalExcel=r[10]==null?null:Number(r[10]);
+      const hppExcel=r[11]==null?null:Number(r[11]);
+      const hargaBeliExcel=Number(r[8]);
+      
+      // Kolom N (Pcs/Kg): pengali isi per satuan. Dipakai untuk rekonsiliasi,
+      // BUKAN untuk mengalikan Qty (Qty = kolom G apa adanya).
+      const pcsKg=r[13];
+      const isStandardUnit=['PCS','RT','RTG','KG','SLOF','SLOP'].includes(String(pcsKg).toUpperCase().trim());
+      const multiplier=(isStandardUnit||!Number.isFinite(Number(pcsKg)))?1:Number(pcsKg);
+      
+      // ACUAN HARGA BELI: Kolom L (HPP Modal/Unit) = HPP per satuan pembelian.
+      // Rekonsiliasi: (L / N) x N x G = K  ->  HPP per pcs x Pcs/Kg x Jumlah = Total Modal.
+      // Bila kolom K tersedia, pakai (K - Angkut) / G agar persis dengan Excel.
+      let hargaBeli=hargaBeliExcel;
+      if(totalModalExcel!=null&&Number.isFinite(totalModalExcel)&&totalModalExcel>0&&qty>0){
+        hargaBeli=(totalModalExcel-angkut)/qty;
+      }else if(hppExcel!=null&&Number.isFinite(hppExcel)&&hppExcel>0){
+        hargaBeli=hppExcel;
+      }
+      if(!Number.isFinite(hargaBeli)||hargaBeli<=0)hargaBeli=hargaBeliExcel;
+      
+      return {
+        tanggal:ymd(r[1]),
+        no_nota:String(r[2]??'-').trim()||'-',
+        kategori:String(r[3]||'').trim(),
+        supplier:ALIAS[String(r[4]).trim().toUpperCase()]||String(r[4]).trim().toUpperCase(),
+        barang:String(r[5]).trim(),
+        qty: qty,
+        satuan:String(r[7]||'unit').trim(),
+        harga_beli: hargaBeli,
+        biaya_angkut: angkut,
+        harga_jual:r[12]==null?null:Number(r[12]),
+        isi_per_satuan: multiplier > 0 ? multiplier : 1
+      };
+    });
     const supplierRows=sheetRows(wb,'Master Supplier').filter(r=>typeof r[1]==='number'&&r[2]).map(r=>({nama:String(r[2]).trim().toUpperCase(),kategori:r[3],kontak:r[4],telp:r[5]?String(r[5]):null,lokasi:r[6],pembayaran:r[7]}));
     if(!kul.length) return toast('Sheet "Detail Kulakan" tidak berisi data.','error');
     const supplierByName=new Map(supplierRows.map(s=>[s.nama,s]));
     const sup=[...supplierByName.values()];
-    // supplier yang belum ada di master ikut dibuat
     const have=new Set(sup.map(s=>s.nama));
     [...new Set(kul.map(r=>r.supplier))].filter(n=>!have.has(n)).forEach(n=>sup.push({nama:n,kategori:[...new Set(kul.filter(r=>r.supplier===n).map(r=>r.kategori))].join(', ').toUpperCase(),kontak:null,telp:null,lokasi:null,pembayaran:null}));
-    // Tanggal nota di Excel lebih maju dari bulan ini (typo)? tawarkan koreksi, boleh ditolak
     const mkK=kul.map(r=>r.tanggal).sort().pop()?.slice(0,7), now=new Date().toISOString().slice(0,7);
     if(mkK&&mkK>now&&confirm(`Tanggal nota di Excel tertulis bulan ${mkK}, lebih maju dari bulan ini (${now}). Ubah ke bulan ${now}? Pilih Batal untuk memakai tanggal persis seperti di Excel.`)) kul=kul.map(r=>({...r,tanggal:now+r.tanggal.slice(7)}));
     const receipts=await makeReceiptTransactions(kul);
-    if(!confirm(`Impor ${kul.length} baris kulakan, ${sup.length} supplier, dan ${receipts.length} nota ke Detail Pengeluaran? Nota yang sama akan diperbarui, bukan digandakan.`+(st.kulakan.length?`\n\nTabel kulakan berisi ${st.kulakan.length} baris dan akan DIGANTI. Arsip pengeluaran lain tidak dihapus.`:''))) return;
+    if(!confirm(`Impor ${kul.length} baris kulakan, ${sup.length} supplier, dan ${receipts.length} nota ke Detail Pengeluaran?\n\nBaris kulakan lama dan arsip struk hasil import sebelumnya akan DIHAPUS TOTAL, lalu diisi ulang dengan data Excel ini. Jadi hasil import selalu sama dengan file Excel, tidak menumpuk.`)) return;
     let r1=await supabaseClient.from('supplier_kulakan').upsert(sup,{onConflict:'nama'});if(r1.error)throw r1.error;
-    if(st.kulakan.length){const d=await supabaseClient.from('kulakan').delete().gt('id',0);if(d.error)throw d.error;kulakanCleared=true}
+    
+    // 1. Hapus total baris kulakan lama (kolom id dijamin ada di schema).
+    //    Ini mencegah data menumpuk saat file Excel di-upload berkali-kali.
+    const d1=await supabaseClient.from('kulakan').delete().gt('id',0);if(d1.error)throw d1.error;
+    kulakanCleared=true;
+    
+    // 2. Hapus arsip struk hasil import kulakan.
+    //    ID struk import berawalan "KULAKAN-" (lihat makeReceiptTransactions),
+    //    jadi pola ini pasti mengenai semua struk import sebelumnya.
+    //    Struk hasil OCR/foto (source photo_ocr) tidak ikut terhapus.
+    const d2=await supabaseClient.from('transactions').delete().like('id','KULAKAN-%');if(d2.error)throw d2.error;
+    const d3=await supabaseClient.from('transactions').delete().like('keterangan','%kulakan_excel_import_v1%');if(d3.error)throw d3.error;
+    
+    // 3. Simpan data baru.
     r1=await supabaseClient.from('kulakan').insert(kul);if(r1.error)throw r1.error;
     kulakanSaved=true;
-    r1=await supabaseClient.from('transactions').upsert(receipts,{onConflict:'id'});if(r1.error)throw r1.error;
+    r1=await supabaseClient.from('transactions').insert(receipts);if(r1.error)throw r1.error;
     const historyLoaded=await window.loadDataFromSupabase({silent:true});
     await load();draw();
     if(!historyLoaded){toast('Impor tersimpan, tetapi daftar pengeluaran belum diperbarui di layar. Muat ulang halaman untuk melihat hasilnya.','error');return}
