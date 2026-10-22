@@ -2,7 +2,12 @@ const OWNER_EMAIL = 'dzikrii.rahman@gmail.com';
 const SUPABASE_URL = 'https://bxdzfuzrvgbdenawxtba.supabase.co';
 const OCR_PATH = '/.netlify/functions/gemini-receipt-ocr';
 const AI_PATH = '/api/ai';
-const DEFAULT_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+const DEFAULT_MODELS = [
+  'gemini-3.5-flash-lite',
+  'gemini-3-flash-preview',
+  'gemini-3.8-flash',
+  'gemini-3.1-flash-lite-preview'
+];
 // Model Workers AI (gratis, 10.000 neuron/hari) sebagai cadangan saat kuota
 // Gemini habis. gpt-oss-120b hanya bisa teks (bukan vision), jadi dipakai
 // untuk chat/analisis, bukan OCR foto struk.
@@ -120,7 +125,13 @@ async function runOcr(request, env) {
         result = {
           status: response.ok ? 422 : response.status,
           message: String(data?.error?.message || response.statusText || 'Balasan kosong.').replace(/\s+/g, ' ').slice(0, 220),
-          retryThinking: response.status === 400 && !!generationConfig.thinkingConfig
+          retryThinking: response.status === 400 && !!generationConfig.thinkingConfig,
+          // Gemini free tier kadang menolak dari region egress tertentu:
+          // "User location is not supported for the API use." (HTTP 400).
+          // Ini bersifat sementara -> coba lagi dengan model/permalink lain.
+          retryLocation: response.status === 400 && /location is not supported/i.test(
+            String(data?.error?.message || '')
+          )
         };
       } catch (error) {
         result = { status: error?.name === 'AbortError' ? 504 : 0, message: error?.message || 'Tidak dapat terhubung ke Gemini.', timedOut: error?.name === 'AbortError' };
@@ -129,7 +140,8 @@ async function runOcr(request, env) {
       }
       last = { ...result, model };
       console.error('Gemini OCR failed', { model, status: result.status, message: result.message });
-      if (!result.retryThinking) break;
+      if (result.retryThinking || result.retryLocation) continue;
+      break;
     }
     if (!(last && (last.status === 404 || last.status === 429 || last.status >= 500 || last.status === 0))) break;
   }

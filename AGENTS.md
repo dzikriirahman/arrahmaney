@@ -468,6 +468,45 @@ Tambahan penting (terverifikasi 22 Okt 2026 via Cloudflare API):
   `npx wrangler login` (browser OAuth) atau pakai `CLOUDFLARE_API_TOKEN`
   permanen.
 
+### 11.12 OCR Struk (Worker) - SUDAH DIVERIFIKASI
+
+Alur: `Struk` tab -> `Galeri / File` (foto per tahap) -> `Deteksi Tahap Ini`
+-> `Terapkan Hasil Tahap Ini` (WAJIB tiap tahap, berurutan) -> `Simpan Detail
+Pengeluaran`.
+
+Empat tahap: 1. Nama barang, 2. Jumlah, 3. Harga satuan, 4. Total per barang.
+Tiap tahap pakai **foto khusus** (bisa di-crop dulu) supaya akurasinya tinggi.
+
+Hasil test end-to-end 22 Okt 2026 (foto struk sintetis, 6 barang) - **semua 4
+tahap 100% benar**:
+- Nama    : BERAS 1KG / MINYAK GORENG 1L / GULA PASIR 1/4KG / SABUN MANDI BAR / TEH CELUP 25S / GARAM 1/2KG
+- Jumlah  : 2 3 4 5 1 6
+- Harga   : 14000 16500 4500 5500 9500 3000
+- Total   : 28000 49500 18000 27500 9500 18000
+
+Secret worker yang WAJIB ada (semua sudah terpasang):
+- `GEMINI_API_KEY` - kunci Gemini
+- `GEMINI_MODEL` - daftar model, dipisah koma
+- `SUPABASE_ANON_KEY` - untuk verifikasi user (getUser). **Tanpa ini OCR selalu
+  401 "Sesi login berakhir"**.
+
+Model OCR (semua sudah diuji vision + tool):
+`gemini-3.5-flash-lite` (default, 1.8s) | `gemini-3-flash-preview` (6.1s) |
+`gemini-3.8-flash` (6.4s) | `gemini-3.1-flash-lite-preview` (13.6s).
+**Jangan pakai `gemini-2.5-flash`** -> 404 "no longer available to new users".
+
+Error yang sudah ditangani di `worker.js`:
+- `429 quota exceeded` -> coba model berikutnya
+- `404 model not found` -> coba model berikutnya
+- `400 User location is not supported for the API use.` -> **retry** (kadang
+  region egress Cloudflare tidak didukung; bersifat sementara)
+- `400` + `thinkingConfig` -> retry tanpa thinking
+
+`OCR_TOTAL_MS` (default 9000) = budget total satu permintaan OCR.
+
+Skrip bantu test: `buat_struk_uji.py` -> membuat 4 foto struk sintetis
+(`ocr-test-struk-<tahap>.jpg`) untuk menguji OCR tanpa struk asli.
+
 ## 12. Template Tugas dari User (Opsional)
 
 ```
