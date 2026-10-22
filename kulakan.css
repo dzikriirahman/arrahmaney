@@ -43,6 +43,17 @@
 #kulakan .k-row-actions{display:flex;gap:6px;white-space:nowrap}
 #kulakan .k-row-actions button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 10px;min-height:38px;font-size:12px}
 #kulakan .k-row-actions [data-kulakan-delete]{color:#a63d2c;border-color:#ebc8bf}
+#kulakan .k-sup-card{position:relative}
+#kulakan .k-sup-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+#kulakan .k-sup-head h3{margin:0;min-width:0;word-break:break-word}
+#kulakan .k-sup-acts{display:flex;gap:6px;flex:0 0 auto}
+#kulakan .k-sup-acts button{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;min-height:38px;padding:0;border-radius:12px;background:#fff}
+#kulakan .k-sup-edit{color:#2F7F6B;border-color:#c2ddd3}
+#kulakan .k-sup-edit:hover{background:#eff8f4;color:#245f50}
+#kulakan .k-sup-del{color:#a63d2c;border-color:#ebc8bf}
+#kulakan .k-sup-del:hover{background:#fdf1ee;color:#8c2f1d}
+#kulakan .k-sup-acts button:focus-visible{outline:2px solid #2F7F6B;outline-offset:2px}
+#kulakan .k-sup-del:focus-visible{outline-color:#a63d2c}
 #kulakan .k-book-filters{display:grid;grid-template-columns:minmax(200px,2fr) repeat(4,minmax(145px,1fr)) auto;gap:10px;align-items:end;padding:14px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 8px rgba(14,42,33,.05)}
 #kulakan .k-book-filters label{display:flex;min-width:0;flex-direction:column;gap:5px;font-size:11px;font-weight:700;color:var(--mut)}
 #kulakan .k-book-filters input,#kulakan .k-book-filters select{width:100%;min-width:0;min-height:42px;font-size:13px}

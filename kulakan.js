@@ -17,7 +17,7 @@ const store=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(
 
 
 
-const st={kulakan:[],supplier:[],sub:'ringkasan',q:'',kat:'Semua',bookSupplier:'',dateFrom:'',dateTo:'',fk:'Semua',fs:'Semua',editId:null,panel:false,hidden:store('kx-hidden2'),loaded:false,error:''};
+const st={kulakan:[],supplier:[],sub:'ringkasan',q:'',kat:'Semua',bookSupplier:'',dateFrom:'',dateTo:'',fk:'Semua',fs:'Semua',editId:null,supplierEditId:null,panel:false,hidden:store('kx-hidden2'),loaded:false,error:''};
 const root=()=>document.getElementById('kulakan-root');
 const $=id=>document.getElementById(id);
 const toast=(m,t)=>{ if(window.showToast) window.showToast(m,t||'success'); else alert(m); };
@@ -156,6 +156,16 @@ function kulakanForm(editing,id){
    <label>Harga jual / unit<input name="harga_jual" type="number" min="0.01" step="any" value="${editing&&editing.harga_jual!=null?esc(editing.harga_jual):''}"></label>
    <div class="k-form-actions"><button class="btn" type="submit">${editing?'Simpan perubahan':'Tambah barang'}</button>${editing?'<button class="ghost" type="button" id="kx-cancel-edit">Batal</button>':''}</div></form>`;
 }
+function supplierForm(editing,id){
+  return `<form id="${id}">
+   <label>Nama supplier<input name="nama" required value="${esc(editing?.nama||'')}" ${editing?'readonly':''}></label>
+   <label>Kategori<input name="kategori" value="${esc(editing?.kategori||'')}" placeholder="mis. Rokok, Sembako"></label>
+   <label>Kontak / PIC<input name="kontak" value="${esc(editing?.kontak||'')}"></label>
+   <label>Telepon / WhatsApp<input name="telp" value="${esc(editing?.telp||'')}" placeholder="08xxxxxxxxxx"></label>
+   <label>Alamat / lokasi<input name="lokasi" value="${esc(editing?.lokasi||'')}"></label>
+   <label>Syarat bayar<select name="pembayaran"><option value="" ${!editing?.pembayaran?'selected':''}>Belum diisi</option><option value="CASH" ${editing?.pembayaran==='CASH'?'selected':''}>CASH (tunai)</option><option value="TEMPO" ${editing?.pembayaran==='TEMPO'?'selected':''}>TEMPO (piutang)</option></select></label>
+   <div class="k-form-actions"><button class="btn" type="submit">${editing?'Simpan perubahan':'Tambah supplier'}</button>${editing?'<button class="ghost" type="button" id="kx-sup-cancel-edit">Batal</button>':''}</div></form>`;
+}
 function vBuku(){
   const kats=['Semua',...new Set(st.kulakan.map(r=>r.kategori))];
   const bookSuppliers=[...new Set(st.kulakan.map(r=>r.supplier).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
@@ -177,7 +187,8 @@ function vBuku(){
 }
 function vSupplier(){
   return `<header><div class="eyebrow">Supplier</div><h1>Pemasok</h1></header>
-  <section class="wg">${st.supplier.map(s=>{const t=st.kulakan.filter(r=>r.supplier===s.nama);return `<div class="w s4"><h3>${esc(tc(s.nama))}</h3><div class="sub">${esc(tc(s.kategori))}</div><p style="line-height:1.6;margin:0">${esc(tc(s.lokasi))||'Alamat belum diisi'}<br>${esc(s.telp)||'Nomor belum diisi'}</p><div><span class="pill ${s.pembayaran==='CASH'?'g':s.pembayaran?'y':'n'}">${esc(s.pembayaran)||'Syarat bayar belum diisi'}</span></div><div style="margin-top:auto;border-top:1px solid var(--bg);padding-top:12px;font-size:13px;display:flex;justify-content:space-between"><span>${t.length} barang</span><b>${rp(sum(t,r=>Number(r.qty)*Number(r.harga_beli)))}</b></div></div>`}).join('')}</section>`;
+  <div class="w" data-owner-only><h3>Tambah supplier</h3><div class="sub">Isi data supplier baru. Supplier ini bisa dipilih saat mencatat barang kulakan.</div>${supplierForm(null,'kx-sup-f')}</div>
+  <section class="wg">${st.supplier.map(s=>{const t=st.kulakan.filter(r=>r.supplier===s.nama);return `<div class="w s4 k-sup-card"><div class="k-sup-head"><h3>${esc(tc(s.nama))}</h3><div class="k-sup-acts"><button type="button" class="ghost k-sup-edit" data-supplier-edit="${esc(s.nama)}" data-owner-only aria-label="Edit supplier ${esc(tc(s.nama))}" title="Edit supplier ${esc(tc(s.nama))}"><i class="fas fa-pen"></i></button><button type="button" class="ghost k-sup-del" data-supplier-delete="${esc(s.nama)}" data-owner-only aria-label="Hapus supplier ${esc(tc(s.nama))}" title="Hapus supplier ${esc(tc(s.nama))}"><i class="fas fa-trash"></i></button></div></div><div class="sub">${esc(tc(s.kategori))}</div><p style="line-height:1.6;margin:0">${esc(tc(s.lokasi))||'Alamat belum diisi'}<br>${esc(s.telp)||'Nomor belum diisi'}</p><div><span class="pill ${s.pembayaran==='CASH'?'g':s.pembayaran?'y':'n'}">${esc(s.pembayaran)||'Syarat bayar belum diisi'}</span></div><div style="margin-top:auto;border-top:1px solid var(--bg);padding-top:12px;font-size:13px;display:flex;justify-content:space-between"><span>${t.length} barang</span><b>${rp(sum(t,r=>Number(r.qty)*Number(r.harga_beli)))}</b></div></div>`}).join('')}</section>`;
 }
 
 const SUBS=[['ringkasan','Ringkasan'],['buku','Buku Kulakan'],['supplier','Supplier']];
@@ -200,6 +211,9 @@ function draw(){
   if($('kx-f'))$('kx-f').onsubmit=e=>save(e,'kulakan');
   r.querySelectorAll('[data-kulakan-edit]').forEach(button=>button.onclick=()=>startEdit(button.dataset.kulakanEdit));
   r.querySelectorAll('[data-kulakan-delete]').forEach(button=>button.onclick=()=>deleteKulakan(button.dataset.kulakanDelete));
+  r.querySelectorAll('[data-supplier-delete]').forEach(button=>button.onclick=()=>deleteSupplier(button.dataset.supplierDelete));
+  r.querySelectorAll('[data-supplier-edit]').forEach(button=>button.onclick=()=>startSupplierEdit(button.dataset.supplierEdit));
+  if($('kx-sup-f'))$('kx-sup-f').onsubmit=e=>saveSupplier(e);
   if($('kx-fk')){ $('kx-fk').onchange=e=>{st.fk=e.target.value;draw()}; $('kx-fs').onchange=e=>{st.fs=e.target.value;draw()};
     $('kx-tp').onclick=()=>{st.panel=!st.panel;draw()};
     $('kx-panel').onchange=e=>{const id=e.target.dataset.w;st.hidden=e.target.checked?st.hidden.filter(x=>x!==id):[...st.hidden,id];store('kx-hidden2',st.hidden);draw()}; }
@@ -265,6 +279,81 @@ async function deleteKulakan(id){
   }catch(error){
     console.error('Gagal menghapus baris kulakan:',error);
     toast('Gagal menghapus baris kulakan: '+(error.message||'kesalahan database'),'error');
+  }
+}
+
+function startSupplierEdit(nama){
+  if(!window.isAppOwner||!window.isAppOwner()){toast('Hanya pemilik yang dapat mengubah data.','error');return}
+  const row=st.supplier.find(s=>s.nama===nama);
+  if(!row){toast('Supplier tidak ditemukan. Muat ulang data lalu coba lagi.','error');return}
+  closeSupplierEdit();
+  st.supplierEditId=row.id;
+  const dialog=document.createElement('div');
+  dialog.id='kx-sup-edit-overlay';
+  dialog.className='k-edit-overlay';
+  dialog.innerHTML=`<section class="k-edit-modal" role="dialog" aria-modal="true" aria-labelledby="kx-sup-edit-title"><div class="k-edit-heading"><div><div class="eyebrow">Pemasok</div><h2 id="kx-sup-edit-title">Edit supplier</h2><p>Perbarui data supplier tanpa meninggalkan daftar.</p></div><button type="button" class="ghost" id="kx-sup-close-edit" aria-label="Tutup edit"><i class="fas fa-times"></i></button></div>${supplierForm(row,'kx-sup-edit-f')}</section>`;
+  document.getElementById('kulakan').appendChild(dialog);
+  $('kx-sup-edit-f').onsubmit=e=>saveSupplier(e);
+  $('kx-sup-cancel-edit').onclick=closeSupplierEdit;
+  $('kx-sup-close-edit').onclick=closeSupplierEdit;
+  dialog.onclick=e=>{if(e.target===dialog)closeSupplierEdit()};
+  $('kx-sup-close-edit').focus({preventScroll:true});
+}
+function closeSupplierEdit(){
+  const dialog=$('kx-sup-edit-overlay');
+  if(dialog)dialog.remove();
+  st.supplierEditId=null;
+}
+async function saveSupplier(e){
+  e.preventDefault();
+  if(!window.isAppOwner||!window.isAppOwner()){toast('Hanya pemilik yang dapat mengubah data.','error');return}
+  const o=Object.fromEntries(new FormData(e.target));
+  const nama=String(o.nama||'').trim().toUpperCase();
+  if(!nama){toast('Nama supplier wajib diisi.','error');return}
+  o.nama=nama;
+  for(const k of ['kategori','kontak','telp','lokasi','pembayaran']){ if(!o[k]) o[k]=null; }
+  const updating=st.supplierEditId!=null;
+  let response;
+  if(updating){
+    // Nama tidak boleh diubah (dipakai sebagai kunci baris kulakan).
+    delete o.nama;
+    response=await supabaseClient.from('supplier_kulakan').update(o).eq('id',st.supplierEditId).select('id');
+  }else{
+    const bentrok=st.supplier.find(s=>s.nama===nama);
+    if(bentrok){toast('Supplier dengan nama itu sudah ada.','error');return}
+    response=await supabaseClient.from('supplier_kulakan').insert(o);
+  }
+  if(response.error){toast((updating?'Gagal memperbarui':'Gagal menyimpan')+' supplier: '+response.error.message,'error');return}
+  if(updating&&!response.data?.length){toast('Data supplier tidak diperbarui. Baris mungkin sudah dihapus atau akses Anda berubah.','error');return}
+  st.supplierEditId=null;
+  if(updating)closeSupplierEdit();
+  const loaded=await load();
+  draw();
+  if(!loaded){toast('Perubahan tersimpan, tetapi daftar supplier gagal dimuat ulang. Muat ulang halaman.','error');return}
+  toast(updating?'Perubahan supplier berhasil disimpan.':'Supplier berhasil ditambahkan.');
+}
+async function deleteSupplier(nama){
+  if(!window.isAppOwner||!window.isAppOwner()){toast('Hanya pemilik yang dapat mengubah data.','error');return}
+  const row=st.supplier.find(s=>s.nama===nama);
+  if(!row){toast('Supplier tidak ditemukan. Muat ulang data lalu coba lagi.','error');return}
+  const jumlahBarang=st.kulakan.filter(r=>r.supplier===nama).length;
+  const pesan=jumlahBarang
+    ? `Hapus supplier "${row.nama}"?\n\nSupplier ini masih dipakai pada ${jumlahBarang} baris kulakan. Baris kulakan TIDAK ikut terhapus, jadi setelah supplier dihapus baris itu tidak akan muncul di daftar filter supplier.\n\nTindakan ini tidak dapat dibatalkan.`
+    : `Hapus supplier "${row.nama}"? Tindakan ini tidak dapat dibatalkan.`;
+  if(!confirm(pesan))return;
+  try{
+    const {data,error}=await supabaseClient.from('supplier_kulakan').delete().eq('nama',row.nama).select('id');
+    if(error)throw error;
+    if(!data?.length){toast('Supplier tidak dihapus. Data mungkin sudah berubah atau akses Anda ditolak.','error');return}
+    const loaded=await load();
+    draw();
+    if(!loaded){toast('Supplier berhasil dihapus, tetapi daftar gagal dimuat ulang. Muat ulang halaman.','error');return}
+    toast(jumlahBarang
+      ? `Supplier "${row.nama}" dihapus. ${jumlahBarang} baris kulakan tidak ikut terhapus.`
+      : `Supplier "${row.nama}" berhasil dihapus.`);
+  }catch(error){
+    console.error('Gagal menghapus supplier:',error);
+    toast('Gagal menghapus supplier: '+(error.message||'kesalahan database'),'error');
   }
 }
 
