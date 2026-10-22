@@ -327,6 +327,25 @@ async function importExcel(file){
       return Math.abs(chain-K)>Math.max(1,K*0.001);
     });
     if(reconRows.length)return toast(`Impor dibatalkan: ${reconRows.length} baris tidak rekonsiliasi. (HPP/unit x Pcs/Kg) x Jumlah harus sama dengan Total Modal. Contoh: "${reconRows[0][5]}". Perbaiki kolom K, L, atau N di Excel.`,'error');
+    
+    // Kolom K (Total Modal) wajib terisi untuk SETIAP baris. Tanpa ini, baris baru yang
+    // rumus Excel-nya belum di-drag akan dihitung dari kolom I dan bisa salah satuan.
+    const missingTotal=detailRows.filter(r=>{
+      const K=r[10]==null?null:Number(r[10]);
+      return K==null||!Number.isFinite(K)||K<=0;
+    });
+    if(missingTotal.length)return toast(`Impor dibatalkan: ${missingTotal.length} baris belum punya "Total Modal (Rp)" (kolom K). Contoh: "${missingTotal[0][5]}". Salin rumus =G*I+J dari baris di atas lalu tempel ke kolom K baris itu.`,'error');
+    
+    // Kolom M (Harga Jual/Unit) harus >= HPP/unit (kolom L). Kalau jauh lebih kecil
+    // (di bawah 50% HPP), hampir pasti satuan salah: harga jual per pcs
+    // dibandingkan dengan HPP per dus/box.
+    const badPrice=detailRows.filter(r=>{
+      const M=r[12]==null?null:Number(r[12]),L=Number(r[11]);
+      if(M==null||!Number.isFinite(M)||M<=0)return false;
+      if(!Number.isFinite(L)||L<=0)return false;
+      return M < L/2;
+    });
+    if(badPrice.length)return toast(`Impor dibatalkan: ${badPrice.length} baris punya harga jual di bawah 50% HPP (kemungkinan satuan salah). Contoh: "${badPrice[0][5]}". Pastikan kolom M = N x P (Pcs/Kg x Harga Jual per Pcs).`,'error');
     let kul=detailRows.map(r=>{
       // Kolom Excel: A=0 No, B=1 Tanggal, C=2 Nota, D=3 Kategori, E=4 Supplier, F=5 Barang,
       // G=6 Jumlah, H=7 Satuan, I=8 Harga Beli/Unit, J=9 Angkut, K=10 Total Modal,
