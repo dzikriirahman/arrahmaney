@@ -507,6 +507,43 @@ Error yang sudah ditangani di `worker.js`:
 Skrip bantu test: `buat_struk_uji.py` -> membuat 4 foto struk sintetis
 (`ocr-test-struk-<tahap>.jpg`) untuk menguji OCR tanpa struk asli.
 
+### 11.13 Menjalankan services (semua background, tidak ada window)
+
+Tidak ada CMD/terminal yang perlu dibiarkan terbuka. Semua service jalan
+TERPISAH (detached) sehingga **tidak bisa ter-close** dan jendela yang
+menaik-menaik boleh ditutup tanpa apa pun.
+
+| Perintah | Fungsi |
+|---|---|
+| `MULAI-SEMUA.cmd` | Nyalakan semua: penjaga, MCP 8787, WA 19:00, Qwen 5000, kasir HP 8765, hotspot |
+| `MATI-SEMUA.cmd` | Matikan semua (panggil `mati-semua.ps1`) |
+| `mulai-semua.ps1` | Isi logika start (dipanggil MULAI-SEMUA.cmd) |
+| `mati-semua.ps1` | Isi logika stop (dipanggil MATI-SEMUA.cmd) |
+
+Startup Windows: shortcut **"MULAI-SEMUA (AR-RAHMAN).lnk"** di
+`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup` (window
+minimized) + shortcut lama **"KasirARRahman-Auto.lnk"** yang memanggil
+`mulai-otomatis.ps1`. Jadi service otomatis hidup setiap login.
+
+`jaga-server.ps1` (+ `jaga-hp.ps1`, `jaga-qwen.ps1`) adalah **penjaga**:
+tiap 5 menit mengecek port 8787/5000/8765 + proses WA jadwal, dan
+menyalakan ulang yang mati. Itu sebabnya menutup CMD tidak=rowan masalah.
+
+Catatan: Rowboat (port 3220) **tidak** ikut start di MULAI-SEMUA. Dia
+lazy-start on-demand dari chatbubble saat ada chat yang perlu. Itu normal.
+
+### 11.14 Ringkasan status per 22 Okt 2026 (siang)
+
+| Komponen | Status |
+|---|---|
+| Import Kulakan Excel | 178/178 baris, deploy production |
+| Tombol Edit + Hapus di card Pemasok | live |
+| Qwen Live + 20 tool kasir | 2.6-45s, data benar |
+| Rantai AI 6 lapis (termasuk Workers AI) | terverifikasi |
+| OCR struk 4 tahap | 4/4 tahap 100% benar |
+| Cloudflare API token permanen | `cfat_` di HKCU\Environment |
+| Grant Data API Supabase | dijalankan, terverifikasi |
+
 ## 12. Template Tugas dari User (Opsional)
 
 ```
