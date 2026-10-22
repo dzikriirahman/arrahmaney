@@ -288,11 +288,25 @@ terpengaruh.
   ```
 - `supabase-setup.sql` & `kulakan-setup.sql` sudah punya grant ini.
 - `supabase-data-api-grants.sql` = script idempotent untuk tabel yang SUDAH ADA.
-  Jalankan sekali di Supabase > SQL Editor.
 - `supabase-public-viewer.sql` = tampilan publik (baca saja) + hak tulis hanya
   pemilik. Jalankan setelah file setup.
-- Cek hasil: `select table_name, grantee, privilege_type from
-  information_schema.role_table_grants where table_schema='public';`
+- **Cara menjalankan**: buka file SQL → salin **ISI** file → paste di
+  Supabase > SQL Editor > New query > Run. **Jangan tulis nama file di SQL
+  Editor** (SQL Editor hanya menerima SQL, bukan path file).
+- Sequence hanya perlu di-grant untuk tabel ber-`generated always as identity`.
+  Di project ini hanya `kulakan` & `supplier_kulakan` yang punya sequence
+  (`transactions.id` dan `receivables.id` bertipe `text`; `business_settings`
+  tidak punya kolom `id`).
+- Cek hasil:
+  ```sql
+  select table_name, grantee, privilege_type
+  from information_schema.role_table_grants
+  where table_schema = 'public'
+    and table_name in ('transactions','receivables','business_settings','kulakan','supplier_kulakan')
+  order by table_name, grantee, privilege_type;
+  ```
+- Supabase CLI (`npx supabase`) terpasang tapi belum login → butuh
+  `supabase login` (access token). Alternatif tanpa token: SQL Editor manual.
 
 ### 11.8 Jebakan Rowboat yang sudah pernah terjadi
 
