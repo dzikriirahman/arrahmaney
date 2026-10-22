@@ -1,0 +1,17 @@
+grant select on public.transactions to anon;
+grant select, insert, update, delete on public.transactions to authenticated;
+grant select, insert, update, delete on public.transactions to service_role;
+grant select on public.receivables to anon;
+grant select, insert, update, delete on public.receivables to authenticated;
+grant select, insert, update, delete on public.receivables to service_role;
+grant select on public.business_settings to anon;
+grant select, insert, update, delete on public.business_settings to authenticated;
+grant select, insert, update, delete on public.business_settings to service_role;
+grant select on public.kulakan to anon;
+grant select, insert, update, delete on public.kulakan to authenticated;
+grant select, insert, update, delete on public.kulakan to service_role;
+grant select on public.supplier_kulakan to anon;
+grant select, insert, update, delete on public.supplier_kulakan to authenticated;
+grant select, insert, update, delete on public.supplier_kulakan to service_role;
+grant usage, select on sequence public.kulakan_id_seq to authenticated, service_role;
+grant usage, select on sequence public.supplier_kulakan_id_seq to authenticated, service_role;
