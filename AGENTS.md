@@ -398,9 +398,49 @@ Langkah di dashboard (Account API tokens → Create a token):
 6. Continue to summary → Create Token. Token hanya ditampilkan SEKALI
    (format `cfat_` untuk account token, `cfut_` untuk user token).
 
-Verifikasi token: `GET https://api.cloudflare.com/client/v4/user/tokens/verify`
-(header `Authorization: Bearer <token>`). **Wajib** kirim `User-Agent` — tanpa
-itu Cloudflare balas 403 / 1010.
+### Verifikasi token — endpoint BERBEDA per jenis token
+
+| Jenis token | Prefix | Endpoint verify |
+|---|---|---|
+| **Account token** (yang dipakai project ini) | `cfat_` | `GET /accounts/2eb226a4cb90e1d9f3b97c12de9d8101/tokens/verify` |
+| User token | `cfut_` | `GET /user/tokens/verify` |
+
+Memakai endpoint yang salah -> **"Invalid API Token" (401)** padahal tokennya
+sah. `cloudflare_token.py` & `cloudflare-token.ps1` sudah mencoba keduanya.
+
+Header wajib: `Authorization: Bearer <token>` + `User-Agent` (tanpa User-Agent
+Cloudflare balas 403 / 1010).
+
+### Cara UI dashboard (verified 22 Okt 2026)
+
+URL yang benar (tanpa `account/`):
+`https://dash.cloudflare.com/2eb226a4cb90e1d9f3b97c12de9d8101/api-tokens`
+
+Langkah:
+1. **Create Token** -> template **"Start from scratch"** (Custom).
+   Template "Edit Cloudflare Workers" bisa gagal: daftar permission groups
+   tidak termuat (console: `Permission label "workers_scripts_write" not found
+   in permission groups`) sehingga hanya 2 baris yang tampil.
+   Mode Custom memuat **Developer Platform 0/62** dengan semua permission.
+2. Scope dropdown: **Entire Account**.
+3. Search: `Workers Scripts` -> baris **"Workers Scripts"** bertanda
+   **Legacy**, centang kolom **Edit** (deskripsi jadi "Grants write access to
+   Cloudflare Workers scripts"). Ada juga permission baru **"Workers"**
+   (Metadata Read-only / Content Read-only / Editor / Admin) - itu untuk
+   akses script source, bukan yang dipakai `wrangler deploy`.
+4. Account Resources -> Include -> Specific account ->
+   `Dzikrii.rahman@gmail.com's Account`. Zone Resources kosongkan.
+5. Token expiration -> **No expiration**.
+6. Continue to summary -> Create Token. Token `cfat_...` hanya ditampilkan
+   SEKALI.
+
+### Token yang sudah terpasang
+
+`CLOUDFLARE_API_TOKEN` tersimpan di registry `HKCU\Environment` (permanen,
+diterima semua terminal baru). `npx wrangler whoami` kini reporting
+"logged in with an Account API Token". Deploy tidak pernah expired lagi.
+
+Token ID: `d5bbf0fb976582bf3253978ae5557d43` (status active).
 
 Akun ini **pakai SSO Google**. Kalau login dashboard gagal: pakai email yang
 **sama persis** dengan yang terdaftar di Cloudflare
