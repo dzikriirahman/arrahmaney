@@ -167,28 +167,58 @@ Simpan status di `PROGRESS.md` di root project, supaya sesi baru tidak perlu riw
 
 | Urutan | Layanan | Berkas | Fungsi |
 |--------|---------|--------|--------|
-| 1 | Rowboat (provider `google`) | `chatbubble.py` |Utama: agent `kasir-ar-rahman` + 20 tool MCP kasir |
-| 2 | Rowboat, model lain | `chatbubble.py` | Retry otomatis kalau model sebelumnya kena kuota |
+| 1 | Rowboat (provider `google`) | `chatbubble.py` | Utama: agent `kasir-ar-rahman` + 20 tool MCP kasir |
+| 2 | Rowboat, model lain | `chatbubble.py` | Retry otomatis kalau model sebelumnya kena kuota / salah baca tanggal |
 | 3 | Gemini REST + MCP | `gemini_mcp.py` | Bypass Rowboat, tool kasir dijalankan lokal |
 | 4 | Ollama cloud (`minimax-m3.1-flash:cloud`) | `chatbubble.py` | Banting, **tanpa akses data toko** |
-| 5 | Pesan jujur ke user | `chatbubble.py` | Menjelaskan kuota habis, bukan mengarang angka |
+| 5 | Cloudflare Workers AI | `chatbubble.py` → `/api/ai` | **Gratis, 10.000 neuron/hari**, tanpa akses data toko |
+| 6 | Pesan jujur ke user | `chatbubble.py` | Menjelaskan kuota habis, bukan mengarang angka |
 
-### 11.2 Batas kuota Gemini free tier — WAJIB DILALUI
+Endpoint `/api/ai` di Worker punya rantainya sendiri: Gemini (rotasi model)
+→ Workers AI (`@cf/openai/gpt-oss-120b`, `@cf/meta/llama-3.2-3b-instruct`).
+Bisa dipaksa lewat `{"provider": "workers-ai"}` untuk testing.
+
+### 11.2 Model Gemini yang TERBUKTI benar — JANGAN tambah sembarangan
+
+Diuji 2x pada 22 Okt 2026 (tepat tanggal + tool-calling + jawaban benar):
+
+| Model | Hasil | Catatan |
+|---|---|---|
+| `gemini-3.5-flash-lite` | OK 3.1s | Paling cepat & paling akurat → jadi default |
+| `gemini-flash-lite-latest` | OK 3.1s | Cadangan |
+| `gemini-3-flash-preview` | OK 4.1s | Cadangan |
+| `gemini-3.1-flash-lite-preview` | OK 13-22s | Cadangan terakhir (lambat) |
+
+**DILARANG dipakai** (sudah diuji & bermasalah):
+- `gemini-3.1-flash-lite` — **salah baca tanggal konteks**, jawab
+  "Omzet hari ini (19 Mei 2025) adalah Rp 0" padahal ctx-nya 22 Oktober 2026.
+- `gemini-3.7-flash`, `gemini-3.5-flash`, `gemini-3.8-flash`,
+  `gemini-flash-latest` — FAIL / 429.
+
+**Model yang salah baca tanggal diblokir otomatis**:
+`_tandai_model_jahat()` → `gemini-model-jahat.json`. `_jawaban_tanggal_salah()`
+di `chatbubble.py` mendeteksi pola "nama bulan + tahun != tahun berjalan" lalu
+retry dengan model lain.
+
+### 11.3 Batas kuota Gemini free tier — WAJIB DILALUI
 
 - **20 request per HARI per model** (`GenerateRequestsPerDayPerModel-FreeTier`).
 - Satu turn Rowboat = 2-3 request (model call + tool call + ulang).
 - `gemini_mcp.py` menyimpan cache kuota di `gemini-kuota.json` (TTL 20 jam) dan
-  merotasi 8 model: `gemini-3.7-flash`, `gemini-3.5-flash-lite`,
-  `gemini-flash-lite-latest`, `gemini-3.1-flash-lite`, `gemini-flash-latest`,
-  `gemini-3.8-flash`, `gemini-3.5-flash`, `gemini-3.6-flash`.
+  merotasi model sesuai `MODEL_DEFAULT`.
+- Reset harian tengah malam WIB → `auto_reset_kuota()` membersihkan cache
+  yang lewat tengah malam.
 - Model dipakai per-request lewat `config.agent.overrides.model` (Rowboat
   mengabaikan model di `sessions:sendMessage` tanpa override).
 - **Jangan benchmark semua model sekaligus** — itu menghabiskan kuota harian.
   Satu turn Rowboat saja sudah memakai kuota 3 model.
 - `_tanya_ollama()` tidak punya tool kasir, jadi jawabannya harus jujur
   (sudah diatur di system prompt fallback).
+- **Sesi Rowboat mewarisi model dari turn sebelumnya.** Kalau satu turn salah
+  baca tanggal, turn berikutnya di sesi itu juga bisa salah. Sesi produksi
+  dibersihkan saat `QWEN_SESI_TURN_MAKS` (12 turn) tercapai.
 
-### 11.3 Konfigurasi provider (Rowboat)
+### 11.4 Konfigurasi provider (Rowboat)
 
 - `C:\Users\Lenovo\.rowboat\config\models.json` → `providers.google` =
   `{ "flavor": "google", "apiKey": "...", "contextLength": 1048576 }`.
@@ -199,7 +229,7 @@ Simpan status di `PROGRESS.md` di root project, supaya sesi baru tidak perlu riw
   `provider` + `model`.
 - Restart Rowboat setelah ganti config (port RPC `127.0.0.1:3220`).
 
-### 11.4 Aturan WhatsApp (dari agent kasir)
+### 11.5 Aturan WhatsApp (dari agent kasir)
 
 - `kirim_pesan_whatsapp` **hanya jalan atas perintah eksplisit user**.
 - `gemini_mcp.py` memblokir tool WA kalau tidak ada perintah eksplisit.
@@ -208,7 +238,7 @@ Simpan status di `PROGRESS.md` di root project, supaya sesi baru tidak perlu riw
 - Baileys hanya boleh satu koneksi per akun. `wa/jadwal.ts` membuka koneksi
   on-demand (hanya saat mengirim), `wa/kirim.ts` memakai socket aktif yang ada.
 
-### 11.5 Larangan
+### 11.6 Larangan
 
 - **Jangan jalankan model lokal** (laptop sedang dipakai operasional toko).
   Semua model harus online.
@@ -216,7 +246,7 @@ Simpan status di `PROGRESS.md` di root project, supaya sesi baru tidak perlu riw
 - **Jangan benchmark semua model sekaligus** — kuota 20 request/hari per
   model habis dalam hitungan menit.
 
-### 11.6 Data & hak akses (source_code)
+### 11.7 Data & hak akses (source_code)
 
 - Data di Supabase project `bxdzfuzrvgbdenawxtba` (bukan `knyihjmnvkih...`).
   Anon key ada di `source_code/index.html` (`SUPABASE_ANON_KEY`).
@@ -232,8 +262,39 @@ Simpan status di `PROGRESS.md` di root project, supaya sesi baru tidak perlu riw
   `dist/` ada di `.gitignore`; commit hanya `kulakan.js` / `kulakan.css`.
 - Push bisa ditolak karena Cloudflare bot ikut commit `AGENTS.md`. Solusi:
   `git rebase origin/main` lalu `git push origin main`.
+- **Secret worker**: `npx wrangler secret put GEMINI_API_KEY` (feed dari stdin).
+  Tanpa secret itu OCR TIDAK jalan (balasan 503 "Secret belum dipasang").
+- **Worker AI**: binding `AI` di `wrangler.jsonc` → `env.AI` (Cloudflare
+  Workers AI, gratis 10.000 neuron/hari). Format balasan per model berbeda:
+  - `@cf/openai/gpt-oss-120b` → `{ choices: [{ message: { content } }] }`
+  - `@cf/meta/llama-3.2-3b-instruct` → `{ response: "teks" }`
+  - `@cf/google/gemma-2b-it-lora` → `{ generated_text: "teks" }`
+  Parser di `worker.js` sudah menangani ketiganya.
+- Cloudflare WAF memblokir request tanpa `User-Agent` browser + `Origin`/
+  `Referer` yang cocok → 403 "error code: 1010". Selalu kirim header itu
+  saat memanggil endpoint worker dari script.
 
-### 11.7 Jebakan Rowboat yang sudah pernah terjadi
+### 11.7.1 Grant Data API Supabase (WAJIB — 30 Okt 2026)
+
+Supabase **berhenti memberi grant Data API otomatis ke tabel BARU** di schema
+`public` yang dibuat setelah 30 Oktober 2026. Tabel yang sudah ada tidak
+terpengaruh.
+
+- Grant yang wajib untuk tiap tabel baru:
+  ```sql
+  grant select on public.tabel to anon;
+  grant select, insert, update, delete on public.tabel to authenticated;
+  grant select, insert, update, delete on public.tabel to service_role;
+  ```
+- `supabase-setup.sql` & `kulakan-setup.sql` sudah punya grant ini.
+- `supabase-data-api-grants.sql` = script idempotent untuk tabel yang SUDAH ADA.
+  Jalankan sekali di Supabase > SQL Editor.
+- `supabase-public-viewer.sql` = tampilan publik (baca saja) + hak tulis hanya
+  pemilik. Jalankan setelah file setup.
+- Cek hasil: `select table_name, grantee, privilege_type from
+  information_schema.role_table_grants where table_schema='public';`
+
+### 11.8 Jebakan Rowboat yang sudah pernah terjadi
 
 | Gejala | Akar masalah | Solusi |
 |--------|--------------|--------|
@@ -243,7 +304,7 @@ Simpan status di `PROGRESS.md` di root project, supaya sesi baru tidak perlu riw
 | Ribuan sesi "| Qwen Live" bertumpuk | Retry loop membuat sesi baru tiap gagal-kuota | **Reuse sesi yang sama**; model di-override per-request |
 | Rowboat mengabaikan `model` di `sessions:sendMessage` | Field model tidak ada di payload | Pakai `config.agent.overrides.model = {provider, model}` |
 
-### 11.8 Sesi Rowboat
+### 11.9 Sesi Rowboat
 
 - Sesi produksi disimpan di `qwen-live-sesi.txt` (root project).
 - Sesi produksi harus **bersih** (turn pertama, tanpa riwayat model lain).
