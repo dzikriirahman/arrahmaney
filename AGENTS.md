@@ -334,6 +334,41 @@ terpengaruh.
 - Kalau jawabannya meleset (tanggal/angka aneh), periksa `sessions:list` —
   jangan sampai sesi produksi punya banyak turn dari percobaan sebelumnya.
 
+### 11.10 Cloudflare API token (deploy Worker)
+
+Token OAuth `wrangler login` hanya berlaku **beberapa jam** (kedaluwarsa
+di `~/.wrangler/config/default.toml`, field `expiration_time`). Kalau habis,
+`npx wrangler deploy` gagal dengan `Invalid access token`.
+
+Solusi: **API token permanen** + variabel environment `CLOUDFLARE_API_TOKEN`.
+
+| Helper | Pemakaian |
+|---|---|
+| `cloudflare_token.py` | `python cloudflare_token.py` → tempel token → disimpan ke registry `HKCU\Environment` |
+| `cloudflare-token.ps1` | `.\cloudflare-token.ps1` → tempel token → disimpan ke environment user |
+| Cek saja | `python cloudflare_token.py --verify` |
+
+Membuat token (butuh login dashboard):
+- **User token** (`cfut_...`): https://dash.cloudflare.com/profile/api-tokens
+- **Account token** (`cfat_...`, lebih permanen, recommended):
+  https://dash.cloudflare.com/2eb226a4cb90e1d9f3b97c12de9d8101/account/api-tokens
+
+Permission yang wajib dicentang:
+- **Account → Workers Scripts → Edit**
+- Account → Workers AI → Read (opsional, untuk uji model)
+- Account → Account Settings → Read (opsional)
+- **Zone permissions: KOSONGKAN** — akun ini tidak punya zone
+- Account Resources → Include → Specific account →
+  `Dzikrii.rahman@gmail.com's Account`
+
+Verifikasi token: `GET https://api.cloudflare.com/client/v4/user/tokens/verify`
+(header `Authorization: Bearer <token>`). **Wajib** kirim `User-Agent` — tanpa
+itu Cloudflare balas 403 / 1010.
+
+Akun ini **pakai SSO Google**. Kalau login dashboard gagal: pakai email yang
+**sama persis** dengan yang terdaftar di Cloudflare
+(`dzikrii.rahman@gmail.com`). Alternatif tanpa dashboard: `npx wrangler login`.
+
 ## 12. Template Tugas dari User (Opsional)
 
 ```
