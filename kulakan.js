@@ -360,7 +360,7 @@ async function deleteSupplier(nama){
 /* ---------- Impor dari Excel BELANJA KULAKAN ---------- */
 const ALIAS={'SALES BOWO':'GUDANG GARAM','PLASTIK PASAR JTB':'TOKO PLASTIK','SALES PANDEMAS':'PANDEMAS'};
 function ymd(serial){const d=XLSX.SSF.parse_date_code(serial);return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`}
-function sheetRows(wb,name){const ws=wb.Sheets[name];return ws?XLSX.utils.sheet_to_json(ws,{header:1,range:'A1:T400',defval:null}):[]}
+function sheetRows(wb,name){const ws=wb.Sheets[name];return ws?XLSX.utils.sheet_to_json(ws,{header:1,range:ws['!ref'],defval:null}):[]}
 async function makeReceiptTransactions(rows){
   const groups=new Map();
   rows.forEach(row=>{
