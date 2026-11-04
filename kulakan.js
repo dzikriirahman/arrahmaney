@@ -484,6 +484,14 @@ async function importExcel(file){
     [...new Set(kul.map(r=>r.supplier))].filter(n=>!have.has(n)).forEach(n=>sup.push({nama:n,kategori:[...new Set(kul.filter(r=>r.supplier===n).map(r=>r.kategori))].join(', ').toUpperCase(),kontak:null,telp:null,lokasi:null,pembayaran:null}));
     const mkK=kul.map(r=>r.tanggal).sort().pop()?.slice(0,7), now=new Date().toISOString().slice(0,7);
     if(mkK&&mkK>now&&confirm(`Tanggal nota di Excel tertulis bulan ${mkK}, lebih maju dari bulan ini (${now}). Ubah ke bulan ${now}? Pilih Batal untuk memakai tanggal persis seperti di Excel.`)) kul=kul.map(r=>({...r,tanggal:now+r.tanggal.slice(7)}));
+    // Salah ketik tahun (mis. 2011 padahal 2026): baris tersimpan jauh di dasar Riwayat
+    // dan tidak terbaca di rentang bulan ini. Tawarkan koreksi tahun sebelum disimpan.
+    const yNow=Number(now.slice(0,4));
+    const badYear=kul.filter(r=>Number(r.tanggal.slice(0,4))<yNow-1);
+    if(badYear.length){
+      const sample=[...new Set(badYear.map(r=>r.tanggal))].slice(0,3).join(', ');
+      if(confirm(`${badYear.length} baris punya tahun tidak wajar (contoh: ${sample}), kemungkinan salah ketik tahun. Ubah tahunnya menjadi ${yNow}?\n\nPilih Batal untuk memakai tanggal persis seperti di Excel.`)) kul=kul.map(r=>Number(r.tanggal.slice(0,4))<yNow-1?{...r,tanggal:yNow+r.tanggal.slice(4)}:r);
+    }
     const receipts=await makeReceiptTransactions(kul);
     if(!confirm(`Impor ${kul.length} baris kulakan, ${sup.length} supplier, dan ${receipts.length} nota ke Detail Pengeluaran?\n\nBaris kulakan lama dan arsip struk hasil import sebelumnya akan DIHAPUS TOTAL, lalu diisi ulang dengan data Excel ini. Jadi hasil import selalu sama dengan file Excel, tidak menumpuk.`)) return;
     let r1=await supabaseClient.from('supplier_kulakan').upsert(sup,{onConflict:'nama'});if(r1.error)throw r1.error;
